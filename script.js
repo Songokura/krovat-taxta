@@ -104,7 +104,7 @@
 
   Bed.prototype.render = function () {
     var st = this.state, W = st.W, p = this.pfx, lh = st.legH;
-    var key = [W.toFixed(1), st.model, st.lift.toFixed(3), lh.toFixed(2), st.robot === null ? 'n' : st.robot.toFixed(1), st.dims].join('|');
+    var key = [W.toFixed(1), st.model, st.lift.toFixed(3), lh.toFixed(2), st.robot === null ? 'n' : st.robot.toFixed(1), st.dims, st.matt !== false].join('|');
     if (key === this.lastKey) return;
     this.lastKey = key;
     var self = this;
@@ -239,22 +239,37 @@
       el('line', { x1: s1[0], y1: s1[1], x2: s2[0], y2: s2[1], stroke: '#555', 'stroke-width': 2.2, 'stroke-linecap': 'round' }, this.gLid);
       el('line', { x1: s1[0], y1: s1[1], x2: (s1[0] + s2[0]) / 2, y2: (s1[1] + s2[1]) / 2, stroke: '#9a9a9a', 'stroke-width': 3.2, 'stroke-linecap': 'round' }, this.gLid);
     }
-    // матрас
-    var mx1 = INS, mx2 = W - INS, mu1 = INS, mu2 = L - INS, mv1 = LID, mv2 = LID + MH;
-    var mTop = poly([Q(mx1, mu2, mv2), Q(mx2, mu2, mv2), Q(mx2, mu1, mv2), Q(mx1, mu1, mv2)]);
-    var mFront = poly([Q(mx1, mu2, mv1), Q(mx2, mu2, mv1), Q(mx2, mu2, mv2), Q(mx1, mu2, mv2)]);
-    var mSide = poly([Q(mx2, mu2, mv1), Q(mx2, mu1, mv1), Q(mx2, mu1, mv2), Q(mx2, mu2, mv2)]);
-    el('path', { d: mSide, fill: 'url(#' + p + '-matt)' }, this.gLid);
-    el('path', { d: mSide, fill: '#000', opacity: .2 }, this.gLid);
-    el('path', { d: mFront, fill: 'url(#' + p + '-matt)' }, this.gLid);
-    el('path', { d: mFront, fill: '#000', opacity: .05 + st.lift * .08 }, this.gLid);
-    el('path', { d: mTop, fill: 'url(#' + p + '-matt)' }, this.gLid);
-    el('path', { d: mTop, fill: 'url(#' + p + '-quilt)' }, this.gLid);
-    // кант матраса
-    var e1 = Q(mx1, mu2, mv2), e2 = Q(mx2, mu2, mv2), e3 = Q(mx2, mu1, mv2);
-    el('polyline', { points: pts([e1, e2, e3]), fill: 'none', stroke: '#000', 'stroke-width': .7, opacity: .18 }, this.gLid);
-    var e4 = Q(mx1, mu2, mv1), e5 = Q(mx2, mu2, mv1), e6 = Q(mx2, mu1, mv1);
-    el('polyline', { points: pts([e4, e5, e6]), fill: 'none', stroke: '#000', 'stroke-width': .7, opacity: .18 }, this.gLid);
+    if (st.matt === false) {
+      // без матраса: открытое основание с ламелями
+      var tv = LID;
+      el('path', { d: poly([Q(INS, L - INS, tv), Q(W - INS, L - INS, tv), Q(W - INS, INS, tv), Q(INS, INS, tv)]), fill: '#3e322a' }, this.gLid);
+      var nT = 14;
+      for (var ti = 0; ti < nT; ti++) {
+        var a1 = 8 + ti * (L - 16) / nT, a2 = a1 + (L - 16) / nT * .58;
+        el('path', { d: poly([Q(INS + 2, a1, tv), Q(W / 2 - 3, a1, tv), Q(W / 2 - 3, a2, tv), Q(INS + 2, a2, tv)]), fill: '#dcb98f' }, this.gLid);
+        el('path', { d: poly([Q(W / 2 + 3, a1, tv), Q(W - INS - 2, a1, tv), Q(W - INS - 2, a2, tv), Q(W / 2 + 3, a2, tv)]), fill: '#dcb98f' }, this.gLid);
+      }
+      el('path', { d: poly([Q(W / 2 - 2.5, 4, tv), Q(W / 2 + 2.5, 4, tv), Q(W / 2 + 2.5, L - 4, tv), Q(W / 2 - 2.5, L - 4, tv)]), fill: '#2b231d' }, this.gLid);
+      // верхняя кромка рамы основания
+      el('path', { d: poly([Q(0, L, tv), Q(W, L, tv), Q(W, 0, tv), Q(W - INS, INS, tv), Q(W - INS, L - INS, tv), Q(INS, L - INS, tv)]), fill: '#000', opacity: .0 }, this.gLid);
+    } else {
+      // матрас
+      var mx1 = INS, mx2 = W - INS, mu1 = INS, mu2 = L - INS, mv1 = LID, mv2 = LID + MH;
+      var mTop = poly([Q(mx1, mu2, mv2), Q(mx2, mu2, mv2), Q(mx2, mu1, mv2), Q(mx1, mu1, mv2)]);
+      var mFront = poly([Q(mx1, mu2, mv1), Q(mx2, mu2, mv1), Q(mx2, mu2, mv2), Q(mx1, mu2, mv2)]);
+      var mSide = poly([Q(mx2, mu2, mv1), Q(mx2, mu1, mv1), Q(mx2, mu1, mv2), Q(mx2, mu2, mv2)]);
+      el('path', { d: mSide, fill: 'url(#' + p + '-matt)' }, this.gLid);
+      el('path', { d: mSide, fill: '#000', opacity: .2 }, this.gLid);
+      el('path', { d: mFront, fill: 'url(#' + p + '-matt)' }, this.gLid);
+      el('path', { d: mFront, fill: '#000', opacity: .05 + st.lift * .08 }, this.gLid);
+      el('path', { d: mTop, fill: 'url(#' + p + '-matt)' }, this.gLid);
+      el('path', { d: mTop, fill: 'url(#' + p + '-quilt)' }, this.gLid);
+      // кант матраса
+      var e1 = Q(mx1, mu2, mv2), e2 = Q(mx2, mu2, mv2), e3 = Q(mx2, mu1, mv2);
+      el('polyline', { points: pts([e1, e2, e3]), fill: 'none', stroke: '#000', 'stroke-width': .7, opacity: .18 }, this.gLid);
+      var e4 = Q(mx1, mu2, mv1), e5 = Q(mx2, mu2, mv1), e6 = Q(mx2, mu1, mv1);
+      el('polyline', { points: pts([e4, e5, e6]), fill: 'none', stroke: '#000', 'stroke-width': .7, opacity: .18 }, this.gLid);
+    }
     if (st.lift > 0.08) {
       // низ основания закрывает матрас по мере подъёма: доска и ламели
       var under = Math.min(1, (st.lift - 0.08) / 0.3);
@@ -452,17 +467,17 @@
     chips.innerHTML = '<li>' + t('model.' + cfg.model) + '</li><li><i style="--c:' + COLORS[cfg.color] + '"></i>' + t('fab.' + cfg.fabric) + ' · ' + t('color.' + cfg.color).toLowerCase() + '</li><li>' + cfg.size + 'x200</li>' +
       (cfg.lift ? '<li>' + t('lift.yes') + '</li>' : '') + '<li>' + t('legs.' + cfg.legs) + '</li>' + (cfg.mattress ? '<li>' + t('sum.matt') + ': ' + t('matt.need') + '</li>' : '');
     colorCur.textContent = t('color.' + cfg.color);
-    stagePhotoName.textContent = t('model.' + cfg.model);
     $$('#ptable tbody tr').forEach(function (tr) { tr.classList.toggle('is-cur', +tr.dataset.size === cfg.size); });
   }
   function setPhoto(model) {
+    if (!stagePhoto) return;
     var ph = PHOTOS[model];
     if (stagePhotoImg.getAttribute('src') !== ph.src) { stagePhotoImg.style.opacity = 0; stagePhotoImg.onload = function () { stagePhotoImg.style.transition = 'opacity .4s'; stagePhotoImg.style.opacity = 1; }; stagePhotoImg.setAttribute('src', ph.src); }
     stagePhotoImg.alt = t('model.' + model);
     stagePhoto.style.setProperty('--pos', ph.pos); stagePhoto.style.setProperty('--rot', ph.rot); stagePhoto.style.setProperty('--zoom', ph.zoom);
   }
   function applyAll() {
-    bed.set({ model: cfg.model, W: cfg.size, lift: cfg.lift ? .16 : 0, legs: cfg.legs, legH: LEGH[cfg.legs] });
+    bed.set({ model: cfg.model, W: cfg.size, lift: cfg.lift ? .16 : 0, legs: cfg.legs, legH: LEGH[cfg.legs], matt: !!cfg.mattress });
     stageSvg.style.setProperty('--fab', COLORS[cfg.color]);
     stageSvg.classList.toggle('vel', cfg.fabric === 'velour'); stageSvg.classList.toggle('che', cfg.fabric !== 'velour');
     robot(bed, cfg.legs === 'high');
@@ -476,7 +491,7 @@
       case 'size': cfg.size = +value; tweenState(bed.state, { W: cfg.size }, .8, 'power3.inOut', function () { bed.render(); }); break;
       case 'lift': cfg.lift = +value; playLift(bed); break;
       case 'legs': cfg.legs = value; legsTo(bed, value); break;
-      case 'mattress': cfg.mattress = +value; break;
+      case 'mattress': cfg.mattress = +value; bed.set({ matt: !!cfg.mattress }); break;
     }
     renderSummary();
   }

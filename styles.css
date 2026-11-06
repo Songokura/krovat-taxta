@@ -2,7 +2,7 @@
 :root{
   --paper:#F4EFE7; --paper2:#EBE3D6; --paper3:#E2D9CA; --ink:#1A1714; --ink2:#5B544C; --ink3:#6A6258;
   --line:rgba(26,23,20,.12); --accent:#C1512E; --accent2:#A8421F; --wine:#5A1F2B; --wine2:#3E141D;
-  --wa:#25D366; --wa2:#1EB85A; --white:#fff;
+  --wa:#169A4B; --wa2:#12863F; --white:#fff;
   --ease:cubic-bezier(.2,.7,.2,1); --fast:.2s; --mid:.4s; --slow:1s;
   --r:22px; --r2:14px; --hdr:76px;
   --font:"Golos Text","Segoe UI",system-ui,sans-serif; --disp:"Prata","Noto Serif Display",Georgia,serif;
@@ -387,3 +387,30 @@ ul,ol{padding:0;list-style:none}
 .opt-big .opt-ic svg{width:40px;height:26px;display:block}
 .why-n small{font-size:.3em;margin-left:.2em;letter-spacing:0;font-family:var(--font);font-weight:400}
 .why-it{display:flex;flex-direction:column}.why-t{margin-top:auto}
+
+/* правки 06.11.2026: опции с подписью, фото работ целиком, «почему мы» по центру */
+.opt-big{display:flex;flex-direction:column;align-items:flex-start;justify-content:center;gap:4px}
+.opt-big .opt-t{flex:none}
+.opt-big .opt-s{flex:none;margin-top:0;white-space:normal}
+.opts-3 .opt-big{justify-content:flex-start;gap:12px}
+.works .strip,.wstrip,.works-strip{align-items:flex-start}
+.wcard{flex:0 0 auto}
+.wcard-ph{aspect-ratio:auto;height:min(460px,62vh);border-radius:18px}
+.wcard-ph img{width:auto;height:100%;object-fit:contain;transform:none}
+.wcard:hover .wcard-ph img{transform:none}
+.wcard figcaption{max-width:100%}
+.why-it,.why-it-room{align-items:center;justify-content:center;text-align:center;gap:18px}
+.why-t{margin-top:0}
+.why-ic{margin:0}
+@media (max-width:759px){
+  .wcard{flex:0 0 84vw}
+  .wcard-ph{height:min(400px,56vh)}
+  .wcard-ph img{width:100%;height:100%;object-fit:contain}
+}
+.mnote-price,.mnote-price span{color:rgba(244,239,231,.85)}
+.stage-bar{justify-content:flex-end}
+.why-n{font-size:clamp(56px,5.6vw,92px)}
+@media (max-width:759px){
+  .wcard-ph::before{content:"";position:absolute;inset:-30px;background:var(--src) center/cover no-repeat;filter:blur(22px) brightness(.92) saturate(.9);z-index:0}
+  .wcard-ph img{position:relative;z-index:1}
+}
