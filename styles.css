@@ -419,3 +419,8 @@ ul,ol{padding:0;list-style:none}
   .hero::before{content:"";position:absolute;inset:0;z-index:1;pointer-events:none;
     background:linear-gradient(90deg,rgba(244,239,231,.94) 0,rgba(244,239,231,.86) calc(50% - 60px),rgba(244,239,231,0) calc(50% + 60px))}
 }
+/* бегущая строка: подпись тканей тем же шрифтом, что и цвета */
+.marq-set em{font-family:var(--disp);font-size:22px;letter-spacing:0;text-transform:none;color:var(--accent);padding:0 6px}
+@media (max-width:759px){.marq-set em{font-size:18px}}
+/* SplitText режет строку по высоте: запас под хвосты букв (у, д, р) */
+#h1 > div{padding-bottom:.2em;margin-bottom:-.2em}
