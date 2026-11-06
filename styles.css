@@ -414,3 +414,8 @@ ul,ol{padding:0;list-style:none}
   .wcard-ph::before{content:"";position:absolute;inset:-30px;background:var(--src) center/cover no-repeat;filter:blur(22px) brightness(.92) saturate(.9);z-index:0}
   .wcard-ph img{position:relative;z-index:1}
 }
+/* подложка под текст героя: пол и плинтус не спорят с лидом */
+@media (min-width:760px){
+  .hero::before{content:"";position:absolute;inset:0;z-index:1;pointer-events:none;
+    background:linear-gradient(90deg,rgba(244,239,231,.94) 0,rgba(244,239,231,.86) calc(50% - 60px),rgba(244,239,231,0) calc(50% + 60px))}
+}
