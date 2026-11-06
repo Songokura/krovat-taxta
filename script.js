@@ -516,7 +516,7 @@
       r('sum.fabric') + ': ' + r('fab.' + cfg.fabric) + ', ' + r('sum.color') + ': ' + r('color.' + cfg.color).toLowerCase(),
       r('sum.legs') + ': ' + r('legs.' + cfg.legs),
       r('sum.matt') + ': ' + (cfg.mattress ? r('matt.need') : r('matt.noneed')),
-      r('wa.calc') + ': ' + fmr(price()).replace(/ /g, ' ') + (cfg.mattress ? ' (+ ' + r('wa.matt') + ')' : ''),
+      r('wa.calc') + ': ' + fmt(price()).replace(/ /g, ' ') + (cfg.mattress ? ' (+ ' + r('wa.matt') + ')' : ''),
       r('wa.name') + ': ' + name + ', ' + r('wa.phone') + ': ' + phone
     ];
     if (comment) lines.push(r('wa.comment') + ': ' + comment);
