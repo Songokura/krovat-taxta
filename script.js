@@ -330,7 +330,7 @@
     'model.kolonna': 'Колонна', 'model.kolonna-soft': 'Колонна Софт', 'model.ekran': 'Экран', 'model.dvoynoy-ekran': 'Двойной экран', 'model.klassika': 'Классика',
     'color.belyy': 'Белый', 'color.molochnyy': 'Молочный', 'color.bezhevyy': 'Бежевый', 'color.kapuchino': 'Капучино', 'color.seryy': 'Серый', 'color.grafit': 'Графит', 'color.goluboy': 'Голубой', 'color.pudrovyy': 'Пудровый', 'color.terrakota': 'Терракота', 'color.bordo': 'Бордо',
     'fab.chenille': 'Шенилл', 'fab.velour': 'Велюр',
-    'legs.pad': 'Подпятники', 'legs.leg': 'Ножки', 'models.hint': 'Нажмите дважды - реальное фото', 'models.hint2': 'Нажмите дважды - рисунок', 'legs.high': 'Высокие ножки под робот-пылесос',
+    'legs.pad': 'Подпятники', 'legs.leg': 'Ножки', 'models.hint': 'Нажмите дважды - реальное фото', 'prices.hint1': 'Нажмите на размер - покажем его на рисунке', 'prices.hint2': 'Нажмите ещё раз - откроем конструктор с этим размером', 'models.hint2': 'Нажмите дважды - рисунок', 'legs.high': 'Высокие ножки под робот-пылесос',
     'lift.no': 'Без механизма', 'lift.yes': 'С подъёмным механизмом',
     'sum.model': 'Модель', 'sum.size': 'Размер', 'sum.lift': 'Подъёмный механизм', 'sum.fabric': 'Ткань', 'sum.color': 'цвет', 'sum.legs': 'Опоры', 'sum.matt': 'Матрас',
     'yes': 'да', 'no': 'нет', 'matt.need': 'нужен', 'matt.noneed': 'не нужен',
@@ -553,9 +553,10 @@
       var on = card.classList.toggle('show-photo');
       if (hint) hint.textContent = t(on ? 'models.hint2' : 'models.hint');
     }
-    vis.addEventListener('dblclick', function (e) { e.preventDefault(); flip(); });
+    var lastTouch = 0;
+    vis.addEventListener('dblclick', function (e) { e.preventDefault(); if (Date.now() - lastTouch < 800) return; flip(); });
     vis.addEventListener('touchend', function (e) {
-      var now = Date.now();
+      var now = Date.now(); lastTouch = now;
       if (now - last < 320) { e.preventDefault(); last = 0; flip(); } else last = now;
     }, { passive: false });
   });
@@ -567,9 +568,25 @@
     b.set({ model: 'ekran', W: 160 });
     $$('#ptable tbody tr').forEach(function (tr) {
       tr.addEventListener('mouseenter', function () { tweenState(b.state, { W: +tr.dataset.size }, .6, 'power3.out', function () { b.render(); }); });
-      tr.addEventListener('click', function () {
+      // первое нажатие - показать размер на рисунке, второе по той же строке - в конструктор
+      tr.addEventListener('click', function (e) {
+        var td = e.target.closest('td'), ci = td ? Array.prototype.indexOf.call(tr.children, td) : 0;
+        var hint = $('#ptHint');
+        if (!tr.classList.contains('is-sel')) {
+          $$('#ptable tbody tr').forEach(function (x) { x.classList.toggle('is-sel', x === tr); });
+          tweenState(b.state, { W: +tr.dataset.size }, .6, 'power3.out', function () { b.render(); });
+          liftTo(b, ci === 2 ? 1 : 0, .9);
+          if (hint) { hint.textContent = t('prices.hint2'); hint.classList.add('is-armed'); }
+          return;
+        }
         var inp = $('.steps input[name=size][value="' + tr.dataset.size + '"]');
         if (inp && !inp.checked) { inp.checked = true; onChange('size', tr.dataset.size); }
+        if (ci === 1 || ci === 2) {
+          var lv = ci === 2 ? '1' : '0', li = $('.steps input[name=lift][value="' + lv + '"]');
+          if (li && !li.checked) { li.checked = true; onChange('lift', lv); }
+        }
+        tr.classList.toggle('is-sel', false);
+        if (hint) { hint.textContent = t('prices.hint1'); hint.classList.toggle('is-armed', false); }
         scrollTo('#konstruktor');
       });
       $$('td', tr).forEach(function (td, ci) { td.addEventListener('mouseenter', function () { liftTo(b, ci === 2 ? 1 : 0, .9); }); });
