@@ -330,7 +330,7 @@
     'model.kolonna': 'Колонна', 'model.kolonna-soft': 'Колонна Софт', 'model.ekran': 'Экран', 'model.dvoynoy-ekran': 'Двойной экран', 'model.klassika': 'Классика',
     'color.belyy': 'Белый', 'color.molochnyy': 'Молочный', 'color.bezhevyy': 'Бежевый', 'color.kapuchino': 'Капучино', 'color.seryy': 'Серый', 'color.grafit': 'Графит', 'color.goluboy': 'Голубой', 'color.pudrovyy': 'Пудровый', 'color.terrakota': 'Терракота', 'color.bordo': 'Бордо',
     'fab.chenille': 'Шенилл', 'fab.velour': 'Велюр',
-    'legs.pad': 'Подпятники', 'legs.leg': 'Ножки', 'legs.high': 'Высокие ножки под робот-пылесос',
+    'legs.pad': 'Подпятники', 'legs.leg': 'Ножки', 'models.hint': 'Нажмите дважды - реальное фото', 'models.hint2': 'Нажмите дважды - рисунок', 'legs.high': 'Высокие ножки под робот-пылесос',
     'lift.no': 'Без механизма', 'lift.yes': 'С подъёмным механизмом',
     'sum.model': 'Модель', 'sum.size': 'Размер', 'sum.lift': 'Подъёмный механизм', 'sum.fabric': 'Ткань', 'sum.color': 'цвет', 'sum.legs': 'Опоры', 'sum.matt': 'Матрас',
     'yes': 'да', 'no': 'нет', 'matt.need': 'нужен', 'matt.noneed': 'не нужен',
@@ -415,7 +415,8 @@
   var priceBig = $('#priceBig'), priceSum = $('#priceSum'), sumMatt = $('#sumMatt'), sumList = $('#sumList'), chips = $('#chips'), colorCur = $('#colorCur');
   var stage = $('#stage'), stagePhoto = $('#stagePhoto'), stagePhotoImg = $('#stagePhotoImg'), stagePhotoName = $('#stagePhotoName');
 
-  function price() { return PRICE[cfg.size][cfg.lift ? 1 : 0]; }
+  var LEG_PRICE = { pad: 0, high: 2000 };
+  function price() { return PRICE[cfg.size][cfg.lift ? 1 : 0] + (LEG_PRICE[cfg.legs] || 0); }
   function tweenState(obj, to, dur, ease, onUpd) {
     if (hasGsap && !reduce) return gsap.to(obj, Object.assign({ duration: dur, ease: ease || 'power2.inOut', overwrite: 'auto', onUpdate: onUpd }, to));
     for (var k in to) obj[k] = to[k]; onUpd(); return null;
@@ -545,6 +546,18 @@
     var card = svg.closest('.mcard');
     card.addEventListener('mouseenter', function () { liftTo(b, 1, 1.1); });
     card.addEventListener('mouseleave', function () { liftTo(b, 0, .8); });
+    // телефон: двойное нажатие на рисунок показывает реальное фото и обратно
+    var vis = card.querySelector('.mcard-vis'), hint = card.querySelector('.mcard-hint'), last = 0;
+    function flip() {
+      try { window.getSelection().removeAllRanges(); } catch (err) {}
+      var on = card.classList.toggle('show-photo');
+      if (hint) hint.textContent = t(on ? 'models.hint2' : 'models.hint');
+    }
+    vis.addEventListener('dblclick', function (e) { e.preventDefault(); flip(); });
+    vis.addEventListener('touchend', function (e) {
+      var now = Date.now();
+      if (now - last < 320) { e.preventDefault(); last = 0; flip(); } else last = now;
+    }, { passive: false });
   });
 
   /* ---------- таблица цен: рисунок меняет размер под курсором ---------- */
@@ -646,7 +659,7 @@
 
     // демо-цикл: механизм, другая модель и цвет, другой размер, высокие ножки и робот
     var seq = [
-      { model: 'ekran', color: '#D9C7AC', W: 180, legs: 'leg' },
+      { model: 'ekran', color: '#D9C7AC', W: 180, legs: 'pad' },
       { model: 'dvoynoy-ekran', color: '#EFE6D6', W: 200, legs: 'high' },
       { model: 'klassika', color: '#B99A7A', W: 140, legs: 'pad' },
       { model: 'kolonna-soft', color: '#6E2434', W: 160, legs: 'high' },
