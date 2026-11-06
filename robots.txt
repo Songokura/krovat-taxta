@@ -9,4 +9,4 @@ Allow: /
 Disallow: /assets/lang/
 Disallow: /*lang=kk
 
-Sitemap: https://songokura.github.io/divart/sitemap.xml
+Sitemap: https://songokura.github.io/krovat-taxta/sitemap.xml

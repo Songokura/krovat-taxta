@@ -1,537 +1,721 @@
-/* DivArt. Ванильный JS: плиты и «посадка» подушки, видео-петли, лента, меню, якоря, язык, форма в WhatsApp. */
+/* Рисунок кровати: косая проекция, всё в сантиметрах. Один движок на герой, конструктор и карточки моделей. */
 (function () {
-  "use strict";
-  var doc = document, root = doc.documentElement, W = window;
-  root.classList.add("js");
-  var ASSET_V = ((doc.currentScript && doc.currentScript.src.match(/[?&]v=([^&]+)/)) || [])[1] || "";
-  var REDUCED = W.matchMedia("(prefers-reduced-motion: reduce)").matches;
-  var clamp = function (v, a, b) { return Math.max(a === undefined ? 0 : a, Math.min(b === undefined ? 1 : b, v)); };
-  var easeOut = function (x) { return 1 - Math.pow(1 - x, 3); };
-  var smooth = function (x) { x = clamp(x); return x * x * (3 - 2 * x); };
-  var LANG = "ru";
-  var MOBILE = W.matchMedia("(max-width:760px)").matches;
-  var TOUCH = W.matchMedia("(pointer:coarse)").matches;
-  var VW = W.innerWidth, VH = W.innerHeight;
+  'use strict';
+  var KX = 0.55, KY = 0.30;          // ось глубины уходит вправо-вверх
+  var L = 200, HT = 9, HH = 104, HB = 6, BH = 27, MH = 22, LID = 4, INS = 3;
+  var LEGS = { pad: 2.5, leg: 9, high: 17 };
+  var NS = 'http://www.w3.org/2000/svg';
+  var MAXW = 200;
+  var VB_W = 362, VB_H = 262, FLOOR = 244; // viewBox и линия пола у переднего края
 
-  /* ---------- WhatsApp: один номер, текст по ключу кнопки и языку ---------- */
-  var PHONE = "77025616883";
-  var WA = {
-    ru: {
-      "default": "Здравствуйте! Пишу с сайта DivArt. Хочу рассчитать мебель. Что нужно: ",
-      hero: "Здравствуйте! Пишу с сайта DivArt. Хочу рассчитать мебель для квартиры. Что нужно и размеры: ",
-      menu: "Здравствуйте! Пишу с сайта DivArt. Хочу рассчитать мебель. Что нужно: ",
-      sticky: "Здравствуйте! Пишу с сайта DivArt. Хочу рассчитать мебель. Что нужно: ",
-      kontakty: "Здравствуйте! Пишу с сайта DivArt. Хочу рассчитать мебель. Что нужно и размеры: ",
-      podklyuch: "Здравствуйте! Интересует мебель под ключ для всей квартиры. Комнаты и примерные размеры: ",
-      krovati: "Здравствуйте! Интересует кровать на заказ. Размер спального места и пожелания: ",
-      divany: "Здравствуйте! Интересует диван на заказ. Размер стены и форма (прямой, угловой): ",
-      kresla: "Здравствуйте! Интересуют кресла или пуфы на заказ. Что нужно: ",
-      kukhni: "Здравствуйте! Интересует кухня на заказ. Размеры кухни: ",
-      shkafy: "Здравствуйте! Интересует шкаф или гардеробная на заказ. Размеры ниши: ",
-      shourum: "Здравствуйте! Хочу приехать в шоурум на Серкебаева 4/1. Удобное время: "
-    },
-    en: {
-      "default": "Hello! I am writing from the DivArt website. I would like a quote for furniture. What I need: ",
-      hero: "Hello! I am writing from the DivArt website. I would like a quote for furniture for my apartment. Items and sizes: ",
-      menu: "Hello! I am writing from the DivArt website. I would like a quote for furniture. What I need: ",
-      sticky: "Hello! I am writing from the DivArt website. I would like a quote for furniture. What I need: ",
-      kontakty: "Hello! I am writing from the DivArt website. I would like a quote for furniture. Items and sizes: ",
-      podklyuch: "Hello! I am interested in turnkey furniture for the whole apartment. Rooms and approximate sizes: ",
-      krovati: "Hello! I am interested in a custom bed. Mattress size and wishes: ",
-      divany: "Hello! I am interested in a custom sofa. Wall length and shape (straight, corner): ",
-      kresla: "Hello! I am interested in custom armchairs or ottomans. What I need: ",
-      kukhni: "Hello! I am interested in a custom kitchen. Kitchen dimensions: ",
-      shkafy: "Hello! I am interested in a custom wardrobe or walk-in closet. Niche dimensions: ",
-      shourum: "Hello! I would like to visit the showroom at Serkebayeva 4/1. Convenient time: "
-    }
+  function P(x, y, z) { return [x + z * KX, -y - z * KY]; }
+  function pts(arr) { var s = ''; for (var i = 0; i < arr.length; i++) s += (i ? ' ' : '') + arr[i][0].toFixed(2) + ',' + arr[i][1].toFixed(2); return s; }
+  function el(name, attrs, parent) {
+    var e = document.createElementNS(NS, name);
+    if (attrs) for (var k in attrs) e.setAttribute(k, attrs[k]);
+    if (parent) parent.appendChild(e);
+    return e;
+  }
+  function rot(u, v, a) { var c = Math.cos(a), s = Math.sin(a); return [u * c - v * s, u * s + v * c]; }
+
+  // грань из ткани: цвет + тень + две фактуры (шенилл / велюр), фактуры переключаются классом на корне
+  function face(parent, d, shade, pfx, extra) {
+    var g = el('g', { 'class': 'face' + (extra ? ' ' + extra : '') }, parent);
+    el('path', { d: d, 'class': 'fab' }, g);
+    el('path', { d: d, 'class': 'tex tex-ch', fill: 'url(#' + pfx + '-ch)' }, g);
+    el('path', { d: d, 'class': 'tex tex-vel', fill: 'url(#' + pfx + '-vel)' }, g);
+    if (shade) el('path', { d: d, fill: '#000', opacity: shade }, g);
+    return g;
+  }
+  function poly(arr) { return 'M' + pts(arr).replace(/ /g, 'L') + 'Z'; }
+  function rrect(x, y, w, h, r) {
+    if (typeof r === 'number') r = [r, r, r, r];
+    var lim = Math.min(w / 2, h / 2);
+    var r1 = Math.min(r[0], lim), r2 = Math.min(r[1], lim), r3 = Math.min(r[2], lim), r4 = Math.min(r[3], lim);
+    return 'M' + (x + r1) + ',' + y + 'H' + (x + w - r2) + 'A' + r2 + ',' + r2 + ' 0 0 1 ' + (x + w) + ',' + (y + r2) +
+      'V' + (y + h - r3) + 'A' + r3 + ',' + r3 + ' 0 0 1 ' + (x + w - r3) + ',' + (y + h) +
+      'H' + (x + r4) + 'A' + r4 + ',' + r4 + ' 0 0 1 ' + x + ',' + (y + h - r4) +
+      'V' + (y + r1) + 'A' + r1 + ',' + r1 + ' 0 0 1 ' + (x + r1) + ',' + y + 'Z';
+  }
+
+  function Bed(svg, opts) {
+    opts = opts || {};
+    this.svg = svg;
+    this.pfx = opts.prefix || ('b' + Math.floor(Math.random() * 1e6));
+    this.scene = !!opts.scene; // внутри сцены героя: без своей тени/размеров
+    this.state = { W: 160, model: 'kolonna', lift: 0, legs: 'pad', legH: LEGS.pad, robot: null, fabric: 'chenille', dims: !opts.scene };
+    this.lastKey = '';
+    this.build();
+    this.render();
+  }
+
+  Bed.prototype.build = function () {
+    var s = this.svg, p = this.pfx;
+    if (!this.scene) { s.setAttribute('viewBox', '0 0 ' + VB_W + ' ' + VB_H); }
+    s.classList.add('bed', 'che');
+    var defs = el('defs', null, s);
+    // шенилл: мелкая матовая штриховка
+    var pat = el('pattern', { id: p + '-ch', width: 3, height: 3, patternUnits: 'userSpaceOnUse' }, defs);
+    el('path', { d: 'M0,3L3,0', stroke: '#000', 'stroke-width': .35, opacity: .10 }, pat);
+    el('path', { d: 'M0,0L3,3', stroke: '#fff', 'stroke-width': .3, opacity: .12 }, pat);
+    // велюр: мягкий косой блик
+    var g = el('linearGradient', { id: p + '-vel', x1: 0, y1: 0, x2: 1, y2: 1 }, defs);
+    el('stop', { offset: 0, 'stop-color': '#fff', 'stop-opacity': .42 }, g);
+    el('stop', { offset: .42, 'stop-color': '#fff', 'stop-opacity': .06 }, g);
+    el('stop', { offset: .7, 'stop-color': '#000', 'stop-opacity': .06 }, g);
+    el('stop', { offset: 1, 'stop-color': '#000', 'stop-opacity': .24 }, g);
+    // канал колонны: цилиндр
+    var gc = el('linearGradient', { id: p + '-chan', x1: 0, y1: 0, x2: 1, y2: 0 }, defs);
+    el('stop', { offset: 0, 'stop-color': '#000', 'stop-opacity': .28 }, gc);
+    el('stop', { offset: .35, 'stop-color': '#fff', 'stop-opacity': .22 }, gc);
+    el('stop', { offset: .7, 'stop-color': '#fff', 'stop-opacity': 0 }, gc);
+    el('stop', { offset: 1, 'stop-color': '#000', 'stop-opacity': .32 }, gc);
+    // мягкая панель экрана
+    var gp = el('radialGradient', { id: p + '-puff', cx: .35, cy: .3, r: .9 }, defs);
+    el('stop', { offset: 0, 'stop-color': '#fff', 'stop-opacity': .3 }, gp);
+    el('stop', { offset: .6, 'stop-color': '#fff', 'stop-opacity': .04 }, gp);
+    el('stop', { offset: 1, 'stop-color': '#000', 'stop-opacity': .22 }, gp);
+    // матрас: стёжка ромбом в плоскости верха
+    var pm = el('pattern', { id: p + '-quilt', width: 14, height: 14, patternUnits: 'userSpaceOnUse', patternTransform: 'matrix(1 0 ' + KX + ' ' + (-KY) + ' 0 0)' }, defs);
+    el('path', { d: 'M7,0L14,7L7,14L0,7Z', fill: 'none', stroke: '#000', 'stroke-width': .5, opacity: .08 }, pm);
+    el('circle', { cx: 7, cy: 7, r: .7, fill: '#000', opacity: .1 }, pm);
+    var gm = el('linearGradient', { id: p + '-matt', x1: 0, y1: 0, x2: 0, y2: 1 }, defs);
+    el('stop', { offset: 0, 'stop-color': '#FBFAF7' }, gm);
+    el('stop', { offset: 1, 'stop-color': '#E9E4DB' }, gm);
+    var f = el('filter', { id: p + '-blur', x: '-20%', y: '-40%', width: '140%', height: '180%' }, defs);
+    el('feGaussianBlur', { stdDeviation: 5 }, f);
+    var gl = el('linearGradient', { id: p + '-leg', x1: 0, y1: 0, x2: 1, y2: 0 }, defs);
+    el('stop', { offset: 0, 'stop-color': '#7a4f33' }, gl);
+    el('stop', { offset: .5, 'stop-color': '#a3704e' }, gl);
+    el('stop', { offset: 1, 'stop-color': '#5d3a24' }, gl);
+
+    var root = this.root = el('g', { 'class': 'bed-root' }, s);
+    this.gShadow = el('g', { 'class': 'g-shadow' }, root);
+    this.gHead = el('g', { 'class': 'g-head' }, root);
+    this.gLegs = el('g', { 'class': 'g-legs' }, root);
+    this.gRobot = el('g', { 'class': 'g-robot' }, root);
+    this.gBox = el('g', { 'class': 'g-box' }, root);
+    this.gBase = el('g', { 'class': 'g-base' }, root);
+    this.gLid = el('g', { 'class': 'g-lid' }, root);
+    this.gDims = el('g', { 'class': 'g-dims' }, root);
   };
-  var FORM_LABELS = {
-    ru: { head: "Заявка с сайта DivArt", name: "Имя", phone: "Телефон", msg: "Что нужно" },
-    en: { head: "Request from the DivArt website", name: "Name", phone: "Phone", msg: "What is needed" }
-  };
-  W.addEventListener("click", function (e) {
-    var a = e.target && e.target.closest ? e.target.closest("a[data-wa]") : null;
-    if (!a) return;
-    var key = a.getAttribute("data-wa") || "default";
-    var dict = WA[LANG] || WA.ru;
-    var text = dict[key] || WA.ru[key] || WA.ru["default"];
-    a.setAttribute("href", "https://wa.me/" + PHONE + "?text=" + encodeURIComponent(text));
-  }, true);
 
-  /* ---------- Конверсии Google Ads: gtag подключается на этапе деплоя, здесь только вызовы ---------- */
-  function fireConv(key) {
-    if (typeof W.gtag_report_conversion !== "function" || !W.AW_CONV) return;
-    var sendTo = W.AW_CONV[key];
-    if (sendTo) W.gtag_report_conversion(undefined, sendTo);
-  }
-  W.addEventListener("click", function (e) {
-    var a = e.target && e.target.closest ? e.target.closest('a[href^="tel:"], a[href*="wa.me"]') : null;
-    if (!a) return;
-    fireConv(a.getAttribute("href").indexOf("tel:") === 0 ? "phone" : "contact");
-  }, true);
+  Bed.prototype.set = function (patch) { for (var k in patch) this.state[k] = patch[k]; this.render(); };
 
-  /* ---------- Меню ---------- */
-  var burger = doc.querySelector(".burger"), menu = doc.getElementById("menu");
-  var behind = [doc.getElementById("main"), doc.querySelector(".foot"), doc.getElementById("sticky")];
-  function setMenu(open, returnFocus) {
-    if (!menu || !burger) return;
-    var was = doc.body.classList.contains("menu-open");
-    if (open === was) return;
-    doc.body.classList.toggle("menu-open", open);
-    behind.forEach(function (el) { if (el) { if (open) el.setAttribute("inert", ""); else el.removeAttribute("inert"); } });
-    burger.setAttribute("aria-expanded", open ? "true" : "false");
-    if (open) {
-      menu.hidden = false;
-      requestAnimationFrame(function () { menu.classList.add("open"); });
-      setTimeout(function () { var first = menu.querySelector("a"); if (first) first.focus({ preventScroll: true }); }, 60);
-    } else {
-      menu.classList.remove("open");
-      setTimeout(function () { if (!doc.body.classList.contains("menu-open")) menu.hidden = true; }, 340);
-      if (returnFocus) burger.focus({ preventScroll: true });
+  Bed.prototype.render = function () {
+    var st = this.state, W = st.W, p = this.pfx, lh = st.legH;
+    var key = [W.toFixed(1), st.model, st.lift.toFixed(3), lh.toFixed(2), st.robot === null ? 'n' : st.robot.toFixed(1), st.dims].join('|');
+    if (key === this.lastKey) return;
+    this.lastKey = key;
+    var self = this;
+    function clear(g) { while (g.firstChild) g.removeChild(g.firstChild); }
+
+    // центровка: ширина рисунка = W + 10 + (L+HT)*KX
+    if (!this.scene) {
+      var drawW = W + 10 + (L + HT) * KX;
+      this.root.setAttribute('transform', 'translate(' + ((VB_W - drawW) / 2 + 5).toFixed(2) + ',' + FLOOR + ')');
     }
-  }
-  if (burger) burger.addEventListener("click", function () { var o = doc.body.classList.contains("menu-open"); setMenu(!o, o); });
-  doc.addEventListener("keydown", function (e) { if (e.key === "Escape" && doc.body.classList.contains("menu-open")) setMenu(false, true); });
 
-  /* ---------- Якоря ---------- */
-  var HDR = function () { return parseFloat(getComputedStyle(root).getPropertyValue("--hdr")) || 72; };
-  function targetTop(el) {
-    var r = el.getBoundingClientRect().top + W.pageYOffset;
-    if (el.classList.contains("pw")) return (MOBILE || flowPlate(el)) ? r - HDR() : r;
-    if (el.classList.contains("sec")) return r - HDR();
-    return r - HDR() - 14;
-  }
-  function goTo(id, instant) {
-    var el = doc.getElementById(id);
-    if (!el) return false;
-    setMenu(false);
-    var top = Math.max(0, targetTop(el));
-    if (instant || REDUCED) { root.style.scrollBehavior = "auto"; W.scrollTo(0, top); root.style.scrollBehavior = ""; }
-    else W.scrollTo({ top: top, behavior: "smooth" });
-    return true;
-  }
-  doc.addEventListener("click", function (e) {
-    var a = e.target && e.target.closest ? e.target.closest('a[href^="#"]') : null;
-    if (!a) return;
-    var id = a.getAttribute("href").slice(1);
-    if (!id) return;
-    if (goTo(id)) {
-      e.preventDefault();
-      try { history.pushState(null, "", "#" + id); } catch (err) {}
-      var t = doc.getElementById(id);
-      if (t) { if (!t.hasAttribute("tabindex") && !/^(A|BUTTON|INPUT|SELECT|TEXTAREA)$/.test(t.tagName)) t.setAttribute("tabindex", "-1"); try { t.focus({ preventScroll: true }); } catch (err2) {} }
+    /* ---------- тень на полу ---------- */
+    clear(this.gShadow);
+    if (!this.scene) {
+      el('path', { d: poly([P(-8, 0, -10), P(W + 8, 0, -10), P(W + 8, 0, L + HT + 6), P(-8, 0, L + HT + 6)]), fill: '#000', opacity: .22, filter: 'url(#' + p + '-blur)' }, this.gShadow);
     }
-  });
 
-  /* ---------- Подушка: кромка прогибается под весом, кадр расправляется с отскоком ---------- */
-  /* pressOf(t): t - ход раскрытия 0..1; 1 - сжата, через ноль с перелётом и затуханием */
-  function pressOf(t) {
-    if (t <= 0) return 1;
-    if (t >= 1) return 0;
-    return Math.exp(-3.2 * t) * Math.cos(4.2 * t);
-  }
-  function cushD(w, h, r, D) {
-    var cx = (w / 2).toFixed(1); r = Math.min(r, w / 2, h / 2);
-    var w1 = (w - r).toFixed(1), h1 = (h - r).toFixed(1), d2 = (2 * D).toFixed(1);
-    return "M" + r + ",0 Q" + cx + "," + d2 + " " + w1 + ",0 A" + r + "," + r + " 0 0 1 " + w + "," + r +
-      " L" + w + "," + h1 + " A" + r + "," + r + " 0 0 1 " + w1 + "," + h + " L" + r + "," + h +
-      " A" + r + "," + r + " 0 0 1 0," + h1 + " L0," + r + " A" + r + "," + r + " 0 0 1 " + r + ",0 Z";
-  }
-  var RC = function () { return parseFloat(getComputedStyle(root).getPropertyValue("--rc")) || 28; };
-  function cushInit(el) {
-    el._skin = el.querySelector(".cush-skin");
-    el._pipe = el.querySelector(".cush-pipe path");
-    el._w = 0; el._h = 0; el._p = null; el._o = null; el._rc = RC();
-    return el;
-  }
-  function cushSize(el) {
-    var w = el._skin.offsetWidth, h = el._skin.offsetHeight;
-    if (w !== el._w || h !== el._h) { el._w = w; el._h = h; el._p = null; }
-  }
-  function cushSet(el, p, o, rc) {
-    if (!el._skin) cushInit(el);
-    if (REDUCED) { p = 0; o = 1; }
-    var r = rc === undefined ? el._rc : rc;
-    if (el._p === p && el._o === o && el._r === r) return;
-    if (el._o !== o) { el._o = o; el.style.setProperty("--o", o.toFixed(4)); }
-    if (el._p === p && el._r === r) return;
-    if (el._p !== p) el.style.setProperty("--p", p.toFixed(4));
-    el._p = p; el._r = r;
-    var w = el._w, h = el._h;
-    if (!w || !h) return;
-    var D = Math.max(0, p) * 0.13 * h;
-    if (D > 0.3) {
-      var d = cushD(w, h, r, D);
-      el._skin.style.clipPath = "path('" + d + "')";
-      if (el._pipe) el._pipe.setAttribute("d", d);
-    } else {
-      el._skin.style.clipPath = "";
-      if (el._pipe) el._pipe.setAttribute("d", cushD(w, h, r, 0));
-    }
-  }
-  var win = doc.querySelector(".win");
-  var cushes = [].slice.call(doc.querySelectorAll(".cush")).map(cushInit);
-  function cushResize() {
-    cushes.forEach(function (c) {
-      c._rc = RC(); cushSize(c);
-      if (c._p === null) return;
-      var p = c._p, o = c._o, r = c._r; c._p = null;
-      cushSet(c, p, o, c === win ? r : undefined);
-    });
-  }
-
-  /* ---------- Плиты: enter / stay / exit; подушка по --open ---------- */
-  var pws = [].slice.call(doc.querySelectorAll(".pw"));
-  var sticky = doc.getElementById("sticky"), kont = doc.getElementById("kontakty");
-  var hdr = doc.getElementById("hdr");
-  var INTRO = (location.hash.length > 1 || W.pageYOffset > 80 || REDUCED) ? 1 : 0;
-  var introStart = 0, ticking = false;
-  var st = pws.map(function () { return { open: -1, out: {} }; });
-  var lastTs = 0;
-  function put(el, s, k, v) { if (s.out[k] !== v) { s.out[k] = v; el.style.setProperty(k, v); } }
-  function flowPlate(pw) {
-    var plate = pw.firstElementChild;
-    return !plate || getComputedStyle(plate).position !== "sticky";
-  }
-  function update(ts) {
-    ticking = false;
-    var now = typeof ts === "number" ? ts : performance.now();
-    var dt = lastTs ? Math.min(64, now - lastTs) : 16.7; lastTs = now;
-    var k = 1 - Math.pow(1 - 0.16, dt / 16.7);
-    var H = VH;
-    var pageY = W.pageYOffset;
-    var kontTop = kont ? kont.getBoundingClientRect().top : null;
-    var rects = [], nxtTops = [], i;
-    for (i = 0; i < pws.length; i++) {
-      rects.push(pws[i].getBoundingClientRect());
-      var nx = pws[i].nextElementSibling;
-      nxtTops.push(nx ? nx.getBoundingClientRect().top : null);
-    }
-    var moving = false;
-    for (i = 0; i < pws.length; i++) {
-      var pw = pws[i], r = rects[i], s = st[i];
-      var near = r.bottom > -H * 0.5 && r.top < H * 1.5;
-      if (!near && s.out["--enter"] !== undefined && !s.reset) { s.reset = true; } else if (near) s.reset = false;
-      if (!near && s.reset) continue;
-      var flow = flowPlate(pw);
-      var enter = clamp(1 - r.top / H);
-      var stay = r.height > H ? clamp(-r.top / (r.height - H)) : 0;
-      var exit = (nxtTops[i] !== null && !flow) ? clamp(1 - nxtTops[i] / H) : 0;
-      var isHero = pw.classList.contains("pw-hero");
-      var open;
-      if (isHero) open = REDUCED ? 1 : INTRO;
-      else open = REDUCED ? 1 : (flow ? clamp((enter - 0.18) / 0.5) : clamp((enter - 0.28) / 0.6));
-      if (s.open < 0 || REDUCED || isHero) s.open = open;
-      else {
-        s.open += (open - s.open) * k;
-        if (Math.abs(open - s.open) > 0.002) moving = true; else s.open = open;
+    /* ---------- изголовье ---------- */
+    clear(this.gHead);
+    var Wh = W + 10, Hh = HH - HB;
+    var m = st.model;
+    var rTop = m === 'kolonna-soft' ? 16 : (m === 'ekran' || m === 'dvoynoy-ekran') ? 12 : 2.5;
+    var tl = P(-5, HH, L);
+    var rB = m === 'kolonna-soft' ? 2 : (m === 'ekran' || m === 'dvoynoy-ekran') ? 4 : 2;
+    // фронт - в 2D группе, начало в левом верхнем углу; толщина - задняя копия контура + две прямые кромки
+    var gf = el('g', { transform: 'translate(' + tl[0].toFixed(2) + ',' + tl[1].toFixed(2) + ')' }, this.gHead);
+    var outer = rrect(0, 0, Wh, Hh, [rTop, rTop, rB, rB]);
+    var sx = HT * KX, sy = -HT * KY;
+    var gb = el('g', { transform: 'translate(' + sx.toFixed(2) + ',' + sy.toFixed(2) + ')' }, gf);
+    face(gb, outer, .30, p);
+    face(gf, poly([[rTop, 0], [rTop + sx, sy], [Wh - rTop + sx, sy], [Wh - rTop, 0]]), .10, p);          // верхняя кромка
+    face(gf, poly([[Wh, rTop], [Wh + sx, rTop + sy], [Wh + sx, Hh - rB + sy], [Wh, Hh - rB]]), .34, p);  // боковина
+    var clipId = p + '-hb';
+    var cp = el('clipPath', { id: clipId }, gf);
+    el('path', { d: outer }, cp);
+    face(gf, outer, 0, p);
+    var gi = el('g', { 'clip-path': 'url(#' + clipId + ')' }, gf);
+    if (m === 'kolonna' || m === 'kolonna-soft') {
+      var n = Math.max(5, Math.round(Wh / 13));
+      var cw = Wh / n;
+      for (var i = 0; i < n; i++) {
+        el('rect', { x: i * cw, y: 0, width: cw, height: Hh, fill: 'url(#' + p + '-chan)' }, gi);
+        if (i) el('line', { x1: i * cw, y1: 0, x2: i * cw, y2: Hh, stroke: '#000', 'stroke-width': .7, opacity: .35 }, gi);
       }
-      put(pw, s, "--enter", enter.toFixed(4));
-      put(pw, s, "--stay", (isHero ? easeOut(stay) : stay).toFixed(4));
-      put(pw, s, "--exit", exit.toFixed(4));
-      put(pw, s, "--open", s.open.toFixed(4));
-      var plate = pw.firstElementChild;
-      if (isHero && plate) {
-        var grow = flow ? 0 : easeOut(stay);
-        if (REDUCED) grow = 1;
-        put(plate, s, "--grow", grow.toFixed(4));
-        if (win) {
-          cushSize(win);
-          cushSet(win, pressOf(INTRO) * (1 - grow), smooth(INTRO), win._rc * (1 - grow));
-        }
+      el('path', { d: outer, fill: 'none', stroke: '#000', 'stroke-width': 1.2, opacity: .25 }, gi);
+    } else if (m === 'ekran' || m === 'dvoynoy-ekran') {
+      var fr = 9, panels = m === 'ekran' ? 1 : 2, gap = 3;
+      var pw = (Wh - fr * 2 - gap * (panels - 1)) / panels;
+      el('path', { d: outer, fill: '#000', opacity: .14 }, gi); // рама чуть темнее
+      for (var j = 0; j < panels; j++) {
+        var px = fr + j * (pw + gap);
+        var d = rrect(px, fr, pw, Hh - fr * 2, 7);
+        el('path', { d: d, 'class': 'fab' }, gi);
+        el('path', { d: d, fill: 'url(#' + p + '-puff)' }, gi);
+        el('path', { d: d, fill: 'none', stroke: '#000', 'stroke-width': .9, opacity: .3 }, gi);
+      }
+    } else { // классика
+      el('rect', { x: 0, y: 0, width: Wh, height: Hh, fill: 'url(#' + p + '-puff)' }, gi);
+      el('path', { d: rrect(2.2, 2.2, Wh - 4.4, Hh - 4.4, 2), fill: 'none', stroke: '#fff', 'stroke-width': .6, opacity: .25 }, gi);
+      el('path', { d: outer, fill: 'none', stroke: '#000', 'stroke-width': 1, opacity: .22 }, gi);
+    }
+
+    /* ---------- опоры ---------- */
+    clear(this.gLegs);
+    var legW = st.legs === 'pad' ? 7 : st.legs === 'leg' ? 5.5 : 4.5;
+    var corners = [[W, L - 6], [2, 6], [W - 2, 6]]; // задняя правая, передняя левая, передняя правая
+    for (var c = 0; c < corners.length; c++) {
+      var cx = corners[c][0], cz = corners[c][1];
+      var a = P(cx - legW / 2, 0, cz), b = P(cx + legW / 2, 0, cz), c2 = P(cx + legW / 2, lh, cz), d2 = P(cx - legW / 2, lh, cz);
+      if (st.legs === 'pad') {
+        el('path', { d: rrect(a[0], d2[1], legW, lh, 1), fill: '#2a2623' }, this.gLegs);
       } else {
-        if (!s.cush) s.cush = [].slice.call(pw.querySelectorAll(".cush"));
-        for (var c = 0; c < s.cush.length; c++) { cushSize(s.cush[c]); cushSet(s.cush[c], pressOf(s.open), smooth(s.open)); }
+        var taper = st.legs === 'high' ? 1.2 : .8;
+        el('path', { d: poly([[a[0] + taper, a[1]], [b[0] - taper, b[1]], c2, d2]), fill: 'url(#' + p + '-leg)' }, this.gLegs);
+        el('ellipse', { cx: (a[0] + b[0]) / 2, cy: a[1], rx: legW / 2 + 1.5, ry: 1.2, fill: '#000', opacity: .25 }, this.gLegs);
       }
-      if (plate) plate.classList.toggle("gone", exit >= 1 && !flow);
-      if (!s.txts) s.txts = pw.querySelectorAll(".txt, .hero-txt");
-      var on = isHero ? INTRO > 0.3 : (flow ? enter > 0.25 : enter > 0.6);
-      if (s.on !== on) { s.on = on; for (var t = 0; t < s.txts.length; t++) s.txts[t].classList.toggle("on", on); }
     }
-    if (sticky) {
-      var show = pageY > H * 0.55;
-      if (kontTop !== null && kontTop < H * 0.5) show = false;
-      sticky.classList.toggle("show", show);
+
+    /* ---------- робот-пылесос ---------- */
+    clear(this.gRobot);
+    if (st.robot !== null) {
+      var rz = 34, rx = st.robot, rr = 16;
+      var rc = P(rx, 0, rz);
+      el('ellipse', { cx: rc[0], cy: rc[1] + 1.5, rx: rr + 4, ry: 5.5, fill: '#000', opacity: .18 }, this.gRobot);
+      var top = P(rx, 8, rz);
+      el('path', { d: poly([P(rx - rr, 0, rz), P(rx + rr, 0, rz), P(rx + rr, 8, rz), P(rx - rr, 8, rz)]).replace('Z', ''), fill: 'none' }, this.gRobot);
+      el('ellipse', { cx: rc[0], cy: rc[1], rx: rr, ry: rr * .42, fill: '#1f1e22' }, this.gRobot);
+      el('ellipse', { cx: top[0], cy: top[1], rx: rr, ry: rr * .42, fill: '#34333a' }, this.gRobot);
+      el('ellipse', { cx: top[0], cy: top[1], rx: rr * .55, ry: rr * .24, fill: 'none', stroke: '#6d6c75', 'stroke-width': .8 }, this.gRobot);
+      el('circle', { cx: top[0], cy: top[1], r: 1.6, fill: '#7dd3a6', 'class': 'robot-led' }, this.gRobot);
     }
-    if (hdr) hdr.classList.toggle("scrolled", pageY > 12);
-    if (moving) onScroll();
-  }
-  function onScroll() { if (!ticking) { ticking = true; requestAnimationFrame(update); } }
-  W.addEventListener("scroll", onScroll, { passive: true });
-  W.addEventListener("resize", function () {
-    /* на телефоне смена только высоты - это адресная строка: раскладку не пересчитываем */
-    if (W.innerWidth !== VW) { VW = W.innerWidth; VH = W.innerHeight; MOBILE = W.matchMedia("(max-width:760px)").matches; fitAll(); laneState(); cushResize(); secCushRefresh(); }
-    else if (!TOUCH) { VH = W.innerHeight; }
-    onScroll();
-  });
-  function runIntro(ts) {
-    if (!introStart) introStart = ts;
-    INTRO = clamp((ts - introStart) / 1500);
-    update(ts);
-    if (INTRO < 1) requestAnimationFrame(runIntro);
-  }
 
-  /* ---------- Кадры каталожных секций: посадка при появлении ---------- */
-  var secCush = [].slice.call(doc.querySelectorAll(".sec .cush"));
-  secCush.forEach(function (c) { cushSize(c); cushSet(c, REDUCED ? 0 : 1, REDUCED ? 1 : 0); });
-  function secCushRefresh() { secCush.forEach(function (c) { if (c._done) { cushSize(c); c._p = null; cushSet(c, 0, 1); } }); }
-  function openCush(c) {
-    if (c._done) return;
-    c._done = true;
-    var t0 = 0;
-    function step(ts) {
-      if (!t0) t0 = ts;
-      var o = clamp((ts - t0) / 1400);
-      cushSize(c);
-      cushSet(c, pressOf(o), smooth(o));
-      if (o < 1) requestAnimationFrame(step);
+    /* ---------- бельевой ящик (виден, когда основание поднято) ---------- */
+    clear(this.gBox);
+    var yTop = lh + BH;
+    if (st.lift > 0.001) {
+      el('path', { d: poly([P(0, yTop, 0), P(W, yTop, 0), P(W, yTop, L), P(0, yTop, L)]), fill: '#2b2420' }, this.gBox);
+      // внутренняя левая стенка и задняя стенка
+      el('path', { d: poly([P(0, yTop, 0), P(0, yTop, L), P(4, lh + 6, L), P(4, lh + 6, 0)]), fill: '#1c1714' }, this.gBox);
+      el('path', { d: poly([P(0, yTop, L), P(W, yTop, L), P(W - 4, lh + 6, L - 4), P(4, lh + 6, L - 4)]), fill: '#3a302a' }, this.gBox);
+      // бельё: три стопки
+      var linen = [[0.08, 0.34, 14, 62, '#E8DFD2'], [0.42, 0.72, 11, 76, '#D9CBBC'], [0.76, 0.95, 16, 70, '#C7D0D6']];
+      for (var li = 0; li < linen.length; li++) {
+        var ln = linen[li], x1 = W * ln[0], x2 = W * ln[1], h = ln[2], z2 = ln[3], y0 = lh + 6;
+        el('path', { d: poly([P(x1, y0 + h, 30), P(x2, y0 + h, 30), P(x2, y0 + h, z2), P(x1, y0 + h, z2)]), fill: ln[4] }, this.gBox);
+        el('path', { d: poly([P(x1, y0, 30), P(x2, y0, 30), P(x2, y0 + h, 30), P(x1, y0 + h, 30)]), fill: ln[4] }, this.gBox);
+        el('path', { d: poly([P(x1, y0, 30), P(x2, y0, 30), P(x2, y0 + h, 30), P(x1, y0 + h, 30)]), fill: '#000', opacity: .22 }, this.gBox);
+        el('path', { d: poly([P(x2, y0, 30), P(x2, y0, z2), P(x2, y0 + h, z2), P(x2, y0 + h, 30)]), fill: '#000', opacity: .34 }, this.gBox);
+        el('path', { d: poly([P(x2, y0, 30), P(x2, y0, z2), P(x2, y0 + h, z2), P(x2, y0 + h, 30)]), fill: ln[4], opacity: .5 }, this.gBox);
+      }
     }
-    requestAnimationFrame(step);
-  }
 
-  /* ---------- Подгонка дисплейных заголовков: кегль вниз шагом 5%, пока не влезает ---------- */
-  var fits = [].slice.call(doc.querySelectorAll(".fit"));
-  function fitOne(el) {
-    el.style.fontSize = "";
-    var base = parseFloat(getComputedStyle(el).fontSize), size = base, guard = 0;
-    while (el.scrollWidth > el.clientWidth + 1 && guard < 12) { size *= 0.95; el.style.fontSize = size.toFixed(1) + "px"; guard++; }
-  }
-  function fitAll() { fits.forEach(fitOne); }
-
-  /* ---------- Видео-петли: src подставляется по видимости, снимается вне экрана ---------- */
-  var loops = [].slice.call(doc.querySelectorAll("video.loop"));
-  function playLoop(v) {
-    var ph = v.closest(".cush");
-    if (!v.getAttribute("src")) {
-      v.addEventListener("playing", function () { if (ph) ph.classList.add("is-live"); });
-      v.setAttribute("src", v.getAttribute("data-src") + (ASSET_V ? "?v=" + ASSET_V : ""));
+    /* ---------- царга ---------- */
+    clear(this.gBase);
+    face(this.gBase, poly([P(W, lh, 0), P(W, lh, L), P(W, yTop, L), P(W, yTop, 0)]), .36, p);   // правый бок
+    face(this.gBase, poly([P(0, lh, 0), P(W, lh, 0), P(W, yTop, 0), P(0, yTop, 0)]), .06, p);     // фронт
+    el('path', { d: poly([P(0, yTop - .8, 0), P(W, yTop - .8, 0), P(W, yTop, 0), P(0, yTop, 0)]), fill: '#fff', opacity: .25 }, this.gBase);
+    if (st.lift < 0.001) {
+      face(this.gBase, poly([P(0, yTop, 0), P(W, yTop, 0), P(W, yTop, L), P(0, yTop, L)]), .14, p); // верх рамы под матрасом
     }
-    var p = v.play(); if (p && p.catch) p.catch(function () {});
-  }
-  function stopLoop(v) {
-    var ph = v.closest(".cush");
-    if (ph) ph.classList.remove("is-live");
-    v.pause(); v.removeAttribute("src"); v.load();
-  }
-  if ("IntersectionObserver" in W && !REDUCED && loops.length) {
-    var conn = navigator.connection;
-    var saveData = conn && (conn.saveData || /2g/.test(conn.effectiveType || ""));
-    if (!saveData) {
-      var vio = new IntersectionObserver(function (es) {
-        es.forEach(function (x) { if (x.isIntersecting) playLoop(x.target); else if (x.target.getAttribute("src")) stopLoop(x.target); });
-      }, { threshold: 0.45 });
-      loops.forEach(function (v) { vio.observe(v); });
+
+    /* ---------- основание + матрас (поворот у изголовья) ---------- */
+    clear(this.gLid);
+    var ang = st.lift * 0.78;
+    function Q(x, u, v) { var r = rot(u, v, ang); return P(x, yTop + r[1], L - r[0]); }
+    // борт рамы по периметру (тонкая доска)
+    face(this.gLid, poly([Q(W, L, 0), Q(W, 0, 0), Q(W, 0, LID), Q(W, L, LID)]), .4, p);
+    face(this.gLid, poly([Q(0, L, 0), Q(W, L, 0), Q(W, L, LID), Q(0, L, LID)]), .12, p);
+    if (st.lift > 0.001) {
+      // газлифт
+      var s1 = P(W - 6, lh + 5, L - 48), s2 = Q(W - 6, 46, 0);
+      el('line', { x1: s1[0], y1: s1[1], x2: s2[0], y2: s2[1], stroke: '#555', 'stroke-width': 2.2, 'stroke-linecap': 'round' }, this.gLid);
+      el('line', { x1: s1[0], y1: s1[1], x2: (s1[0] + s2[0]) / 2, y2: (s1[1] + s2[1]) / 2, stroke: '#9a9a9a', 'stroke-width': 3.2, 'stroke-linecap': 'round' }, this.gLid);
     }
-  }
+    // матрас
+    var mx1 = INS, mx2 = W - INS, mu1 = INS, mu2 = L - INS, mv1 = LID, mv2 = LID + MH;
+    var mTop = poly([Q(mx1, mu2, mv2), Q(mx2, mu2, mv2), Q(mx2, mu1, mv2), Q(mx1, mu1, mv2)]);
+    var mFront = poly([Q(mx1, mu2, mv1), Q(mx2, mu2, mv1), Q(mx2, mu2, mv2), Q(mx1, mu2, mv2)]);
+    var mSide = poly([Q(mx2, mu2, mv1), Q(mx2, mu1, mv1), Q(mx2, mu1, mv2), Q(mx2, mu2, mv2)]);
+    el('path', { d: mSide, fill: 'url(#' + p + '-matt)' }, this.gLid);
+    el('path', { d: mSide, fill: '#000', opacity: .2 }, this.gLid);
+    el('path', { d: mFront, fill: 'url(#' + p + '-matt)' }, this.gLid);
+    el('path', { d: mFront, fill: '#000', opacity: .05 + st.lift * .08 }, this.gLid);
+    el('path', { d: mTop, fill: 'url(#' + p + '-matt)' }, this.gLid);
+    el('path', { d: mTop, fill: 'url(#' + p + '-quilt)' }, this.gLid);
+    // кант матраса
+    var e1 = Q(mx1, mu2, mv2), e2 = Q(mx2, mu2, mv2), e3 = Q(mx2, mu1, mv2);
+    el('polyline', { points: pts([e1, e2, e3]), fill: 'none', stroke: '#000', 'stroke-width': .7, opacity: .18 }, this.gLid);
+    var e4 = Q(mx1, mu2, mv1), e5 = Q(mx2, mu2, mv1), e6 = Q(mx2, mu1, mv1);
+    el('polyline', { points: pts([e4, e5, e6]), fill: 'none', stroke: '#000', 'stroke-width': .7, opacity: .18 }, this.gLid);
+    if (st.lift > 0.08) {
+      // низ основания закрывает матрас по мере подъёма: доска и ламели
+      var under = Math.min(1, (st.lift - 0.08) / 0.3);
+      var gu = el('g', { opacity: under }, this.gLid);
+      var uw = poly([Q(0, L, 0), Q(W, L, 0), Q(W, 0, 0), Q(0, 0, 0)]);
+      face(gu, uw, .42, p);
+      el('path', { d: poly([Q(INS, L - INS, 0), Q(W - INS, L - INS, 0), Q(W - INS, INS, 0), Q(INS, INS, 0)]), fill: '#4a3b31' }, gu);
+      var nS = 13;
+      for (var si = 0; si < nS; si++) {
+        var u1 = 8 + si * (L - 16) / nS, u2 = u1 + (L - 16) / nS * .6;
+        el('path', { d: poly([Q(INS + 2, u1, 0), Q(W - INS - 2, u1, 0), Q(W - INS - 2, u2, 0), Q(INS + 2, u2, 0)]), fill: '#d2ad84' }, gu);
+      }
+      el('path', { d: poly([Q(W / 2 - 2.5, 4, 0), Q(W / 2 + 2.5, 4, 0), Q(W / 2 + 2.5, L - 4, 0), Q(W / 2 - 2.5, L - 4, 0)]), fill: '#5a4a3f' }, gu);
+    }
 
-  /* ---------- Лента деталей: стрелки шагом в одну карточку ---------- */
-  var lane = doc.getElementById("lane"), lPrev = doc.querySelector(".lane-btn.prev"), lNext = doc.querySelector(".lane-btn.next");
-  function laneStep() {
-    var card = lane && lane.firstElementChild; if (!card) return 320;
-    var gap = parseFloat(getComputedStyle(lane).columnGap || getComputedStyle(lane).gap) || 0;
-    return card.getBoundingClientRect().width + gap;
-  }
-  function laneState() {
-    if (!lane || !lPrev || !lNext) return;
-    var max = lane.scrollWidth - lane.clientWidth;
-    var none = max <= 1;
-    lPrev.hidden = none; lNext.hidden = none;
-    lPrev.disabled = lane.scrollLeft <= 8;
-    lNext.disabled = lane.scrollLeft >= max - 8;
-  }
-  if (lane) {
-    lPrev.addEventListener("click", function () { lane.scrollBy({ left: -laneStep(), behavior: REDUCED ? "auto" : "smooth" }); });
-    lNext.addEventListener("click", function () { lane.scrollBy({ left: laneStep(), behavior: REDUCED ? "auto" : "smooth" }); });
-    lane.addEventListener("scroll", function () { requestAnimationFrame(laneState); }, { passive: true });
-    laneState();
-  }
-
-  /* ---------- Бегущая лента героя: вторая копия для бесшовного цикла ---------- */
-  var bandT = doc.getElementById("bandT");
-  if (bandT) bandT.innerHTML += bandT.innerHTML;
-
-  /* ---------- Язык: RU в разметке, EN здесь, KZ подгружается отдельным файлом ---------- */
-  var I18N = { ru: {} };
-  I18N.en = {
-    "meta.title": "Custom furniture in Astana, turnkey - DivArt: sofas, beds, kitchens, wardrobes",
-    "meta.desc": "Custom upholstered and cabinet furniture in Astana: sofas, beds, armchairs, ottomans, kitchens, wardrobes and walk-in closets made to your sizes. Own workshop for 6 years, showroom at Serkebayeva 4/1, 1000+ clients, 1-year warranty. Order furniture for the whole apartment and get a bed as a gift.",
-    "nav.pk": "Turnkey", "nav.kr": "Beds", "nav.dv": "Sofas", "nav.all": "All furniture", "nav.op": "Details", "nav.sh": "Showroom", "nav.how": "How to order", "nav.kont": "Contacts",
-    "tel.aria": "Call +7 702 561 68 83", "ig.aria": "DivArt on Instagram", "menu.aria": "Menu",
-    "menu.note": "Astana, Serkebayeva 4/1, 4th floor · daily 09:00-19:00",
-    "hero.cap": "Bed with base lighting, a project in Astana",
-    "hero.kicker": "Astana · custom furniture · since 2020",
-    "hero.t1": "Custom furniture in Astana", "hero.t2": "turnkey for the whole apartment",
-    "hero.lead": "Sofas, beds, armchairs, kitchens and wardrobes made to your sizes. Own workshop<span class=\"m-hide\"> and showroom at Serkebayeva 4/1</span>, 1000+&nbsp;clients in 6&nbsp;years, 1-year warranty.",
-    "hero.cta1": "Get a quote", "hero.cta2": "See the furniture", "hero.ig": "Finished work on Instagram →",
-    "band.1": "Sofas", "band.2": "Beds", "band.3": "Armchairs", "band.4": "Ottomans", "band.5": "Kitchens", "band.6": "Wardrobes", "band.7": "Walk-in closets", "band.8": "Turnkey furniture",
-    "pk.alt": "Turnkey living room: TV wall, shelves and a sofa in a client's apartment in Astana", "pk.cap": "Turnkey apartment: living room, Astana",
-    "pk.kicker": "Turnkey furniture", "pk.h": "All the furniture for your apartment from one maker",
-    "pk.lead": "We have made sofas and beds ourselves for 6 years; kitchens and wardrobes are built to the same project. One measurement, one contract, one team.",
-    "pk.l1": "One style and matching fabrics in every room", "pk.l2": "One deadline and one party responsible for the whole order", "pk.l3": "Measurement, quote and fabric samples in the showroom",
-    "pk.gift": "Gift: a master-bedroom bed when you order furniture for the whole apartment", "pk.btn": "Quote a turnkey order",
-    "kr.kicker": "Beds", "kr.h": "Beds made to your size, up to 220x220",
-    "kr.lead": "Soft headboard of any shape, lift-up mechanism with a storage box, base lighting with touch control, chenille or velour.",
-    "kr.l1": "Lift-up mechanism and a storage box the full length of the bed", "kr.l2": "Perimeter lighting, switched on with a touch", "kr.l3": "Socket cut-outs, a shelf on the rail, a bench instead of the footboard",
-    "kr.btn": "Get a bed price", "kr.alt": "Burgundy velour bed with a soft headboard against a wallpapered wall, project in Astana", "kr.cap": "Velour bed with a lift-up mechanism",
-    "pl.k": "Project photo", "dv.plt": "DivArt sofa in velour",
-    "dv.kicker": "Sofas", "dv.h": "Straight and corner sofas for your living room",
-    "dv.lead": "Straight, corner, modular: sized to the wall, filling chosen for the seat, fabric from the samples in the showroom.",
-    "dv.l1": "Frame and filling made in our own workshop", "dv.l2": "Choose the fabric by touch in the showroom: chenille, velour, linen weave", "dv.l3": "1-year warranty on the frame and mechanisms",
-    "dv.btn": "Get a sofa price",
-    "all.kicker": "All furniture", "all.h": "What we make for an apartment",
-    "all.lead": "Upholstered furniture is our main line, 6 years of production. Cabinet furniture is a new line, built to the same project and the same fabrics.",
-    "c.kr.alt": "White bed with a dark piping and base lighting, made by DivArt", "c.kr.t": "Beds", "c.kr.d": "Headboards of any shape, lift-up mechanism, lighting, sizes up to 220x220.", "c.more": "Learn more",
-    "c.dv.plt": "Corner sofa", "c.dv.t": "Sofas", "c.dv.d": "Straight, corner and modular, sized to your wall.", "c.calc": "Get a quote",
-    "c.ks.plt": "Armchair and ottoman", "c.ks.t": "Armchairs and ottomans", "c.ks.d": "In the fabric of your sofa or bed, so the room comes together as one set.",
-    "c.ku.plt": "Custom kitchen", "c.ku.t": "Kitchens", "c.ku.d": "Sized to your kitchen, in one project with the upholstered furniture.",
-    "c.sh.plt": "Walk-in closet", "c.sh.t": "Wardrobes and walk-in closets", "c.sh.d": "Built-in wardrobes, walk-in closets, hallway units.",
-    "op.kicker": "Details", "op.h": "What can be built into your furniture",
-    "op.lead": "Features we have already made for clients in Astana. All filmed on our projects, not taken from a catalogue.",
-    "lane.prev": "Previous", "lane.next": "Next",
-    "op.1.alt": "Bed lift-up mechanism with gas lifts, open base", "op.1.t": "Lift-up mechanism", "op.1.d": "Gas lifts raise the base with one hand.",
-    "op.2.alt": "Bed with warm lighting around the base", "op.2.t": "Touch-controlled lighting", "op.2.d": "Perimeter light switches on with a touch.",
-    "op.3.alt": "Metal shelf on the bed rail and socket cut-outs in the headboard", "op.3.t": "Shelf and sockets", "op.3.d": "Phone and book within reach, charging without cables on the floor.",
-    "op.4.alt": "Storage box the full length of the bed base", "op.4.t": "Storage box", "op.4.d": "The full length of the bed: duvets, pillows, seasonal things.",
-    "op.5.alt": "White bed with piping and a built-in bench", "op.5.t": "Bench instead of a footboard", "op.5.d": "A place to sit at the foot of the bed, contrasting piping.",
-    "op.6.alt": "Turnkey bedroom: bed with lighting, mirror and lamp", "op.6.t": "Turnkey bedroom", "op.6.d": "Bed, lighting and textiles in one project.",
-    "op.7.alt": "Assembling a bed base at the client's home", "op.7.t": "Assembly on site", "op.7.d": "We deliver and assemble ourselves, no third-party fitters.",
-    "op.ig": "More work on Instagram",
-    "dov.kicker": "Why DivArt", "dov.h": "Paid and delivered. Our own workshop, not a middleman",
-    "dov.lead": "You pay the maker, not a reseller: workshop, showroom and contract in one place. Our clients include bloggers and actors of Kazakh cinema.",
-    "dov.n1": "1000+", "dov.t1": "upholstered furniture clients in 6 years", "dov.n2": "Own workshop", "dov.t2": "frame, filling and upholstery made in Astana",
-    "dov.n3": "Showroom", "dov.t3": "Serkebayeva 4/1: fabrics and finished furniture", "dov.n4": "1 year", "dov.t4": "warranty on all furniture",
-    "dov.alt": "Soft bed headboard in light chenille, close-up", "dov.cap": "Chenille on the headboard, made by DivArt",
-    "sh.plt": "DivArt showroom, Serkebayeva 4/1", "sh.kicker": "Showroom", "sh.h": "Sit on the sofa before you order",
-    "sh.lead": "Serkebayeva 4/1, 4th floor. Fabric samples, finished furniture, measurement and quote on the spot. Daily 09:00-19:00.",
-    "sh.btn1": "Book a showroom visit", "sh.btn2": "Route in 2GIS",
-    "how.kicker": "How to order", "how.h": "Four steps to furniture in your apartment",
-    "how.t1": "Request and measurement", "how.d1": "Write on WhatsApp or leave your number. We measure the apartment or calculate from your sizes.",
-    "how.t2": "Design and quote", "how.d2": "We pick shapes, fabrics and filling in the showroom. The price is calculated per project.",
-    "how.t3": "Production", "how.d3": "Frame, filling and upholstery in our own workshop in Astana.",
-    "how.t4": "Delivery and assembly", "how.d4": "We deliver, assemble and take the packaging away. 1-year warranty.",
-    "how.alt": "Grey chenille bed with a metal shelf on the rail and socket cut-outs", "how.cap": "Shelf on the rail and sockets in the headboard",
-    "faq.kicker": "Questions", "faq.h": "What people ask before ordering",
-    "faq.q1": "How much does a sofa or a bed cost?", "faq.a1": "The price depends on sizes, fabric, filling and mechanisms. Send the sizes and a photo of the room on WhatsApp: we will calculate it and invite you to the showroom to see the fabrics.",
-    "faq.q2": "What is the turnkey gift?", "faq.a2": "If you order all the furniture for your apartment, we make the master-bedroom bed as a gift.",
-    "faq.q3": "What is the warranty?", "faq.a3": "1 year on all furniture. It is our own workshop: if anything happens, you call us instead of looking for a new contractor.",
-    "faq.q4": "Do you work outside Astana?", "faq.a4": "Yes, we make furniture for Astana and Karaganda.",
-    "kont.kicker": "Contacts", "kont.h": "Tell us what your apartment needs", "kont.lead": "We reply right away: we will quote, invite you to the showroom or come to measure.",
-    "kont.2gis": "2GIS", "kont.i1": "Astana, Serkebayeva 4/1, 4th floor - showroom and office", "kont.i2": "Daily 09:00-19:00. We work in Astana and Karaganda",
-    "form.h": "Request a quote", "form.name": "Name", "form.name.ph": "How should we address you", "form.phone": "Phone", "form.err": "Enter a phone number of at least 10 digits.",
-    "form.msg": "What is needed", "form.msg.ph": "Corner sofa 280 cm and a bed 180x200, new build", "form.btn": "Send via WhatsApp", "form.note": "The request opens in WhatsApp with a ready text. Samat replies.",
-    "thanks.h": "Thank you!", "thanks.p": "The request has gone to WhatsApp. We will reply during working hours, 09:00-19:00.",
-    "foot.tag": "Custom furniture in Astana. Sole proprietor Divano art", "sticky.call": "Call"
+    /* ---------- размерная линия ---------- */
+    clear(this.gDims);
+    if (st.dims) {
+      var d1 = P(0, -4, -12), d2 = P(W, -4, -12);
+      el('line', { x1: d1[0], y1: d1[1], x2: d2[0], y2: d2[1], stroke: 'currentColor', 'stroke-width': .6, opacity: .5 }, this.gDims);
+      el('line', { x1: d1[0], y1: d1[1] - 3, x2: d1[0], y2: d1[1] + 3, stroke: 'currentColor', 'stroke-width': .6, opacity: .5 }, this.gDims);
+      el('line', { x1: d2[0], y1: d2[1] - 3, x2: d2[0], y2: d2[1] + 3, stroke: 'currentColor', 'stroke-width': .6, opacity: .5 }, this.gDims);
+      var t = el('text', { x: (d1[0] + d2[0]) / 2, y: d1[1] + 10, 'text-anchor': 'middle', 'class': 'dim-t' }, this.gDims);
+      t.textContent = Math.round(W) + ' x 200';
+      var s1d = P(W, -4, 0), s2d = P(W, -4, L);
+      var sx = s1d[0] + 10, sx2 = s2d[0] + 10;
+      el('line', { x1: sx, y1: s1d[1], x2: sx2, y2: s2d[1], stroke: 'currentColor', 'stroke-width': .6, opacity: .5 }, this.gDims);
+    }
   };
-  var RU = I18N.ru;
-  var iEls = [].slice.call(doc.querySelectorAll("[data-i]"));
-  var phEls = [].slice.call(doc.querySelectorAll("[data-i-ph]"));
-  var ariaEls = [].slice.call(doc.querySelectorAll("[data-i-aria]"));
-  var altEls = [].slice.call(doc.querySelectorAll("[data-i-alt]"));
-  var metaDesc = doc.querySelector('meta[name="description"]');
-  iEls.forEach(function (el) { var k = el.getAttribute("data-i"); if (RU[k] == null) RU[k] = el.innerHTML; });
-  phEls.forEach(function (el) { RU[el.getAttribute("data-i-ph")] = el.getAttribute("placeholder"); });
-  ariaEls.forEach(function (el) { RU[el.getAttribute("data-i-aria")] = el.getAttribute("aria-label"); });
-  altEls.forEach(function (el) { RU[el.getAttribute("data-i-alt")] = el.getAttribute("alt"); });
-  RU["meta.title"] = doc.title;
-  RU["meta.desc"] = metaDesc ? metaDesc.getAttribute("content") : "";
-  function t(key) { var d = I18N[LANG] || RU; return d[key] != null ? d[key] : RU[key]; }
-  function applyLang(lang) {
-    if (!I18N[lang]) lang = "ru";
-    LANG = lang;
-    iEls.forEach(function (el) { var v = t(el.getAttribute("data-i")); if (v != null) el.innerHTML = v; });
-    phEls.forEach(function (el) { var v = t(el.getAttribute("data-i-ph")); if (v != null) el.setAttribute("placeholder", v); });
-    ariaEls.forEach(function (el) { var v = t(el.getAttribute("data-i-aria")); if (v != null) el.setAttribute("aria-label", v); });
-    altEls.forEach(function (el) { var v = t(el.getAttribute("data-i-alt")); if (v != null) el.setAttribute("alt", v); });
-    doc.title = t("meta.title");
-    if (metaDesc) metaDesc.setAttribute("content", t("meta.desc"));
-    root.setAttribute("lang", lang);
-    [].forEach.call(doc.querySelectorAll(".lang button"), function (b) {
-      var on = b.getAttribute("data-lang") === lang;
-      b.classList.toggle("is-active", on); b.setAttribute("aria-pressed", on ? "true" : "false");
-    });
-    try { localStorage.setItem("divart-lang", lang); } catch (e) {}
-    if (doc.fonts && doc.fonts.ready) doc.fonts.ready.then(fitAll); else fitAll();
+
+  window.BedDraw = Bed;
+  window.BedDraw.LEGS = LEGS;
+  window.BedDraw.P = P;
+})();
+/* Кровать Тахта - логика страницы: конструктор, герой, карточки, лента, язык. */
+(function () {
+  'use strict';
+  var $ = function (s, r) { return (r || document).querySelector(s); };
+  var $$ = function (s, r) { return Array.prototype.slice.call((r || document).querySelectorAll(s)); };
+  var reduce = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+  var hasGsap = typeof window.gsap !== 'undefined';
+  var NB = ' ';
+
+  /* ---------- прайс (copy.md) ---------- */
+  var PRICE = { 80: [80000, 100000], 90: [85000, 105000], 100: [95000, 110000], 120: [100000, 115000], 140: [105000, 120000], 160: [110000, 125000], 180: [115000, 130000], 200: [120000, 140000] };
+  var COLORS = { belyy: '#F2F0EB', molochnyy: '#EFE6D6', bezhevyy: '#D9C7AC', kapuchino: '#B99A7A', seryy: '#9A9A98', grafit: '#4A4A4D', goluboy: '#8FA9BE', pudrovyy: '#D9A5A0', terrakota: '#C1512E', bordo: '#6E2434' };
+  var PHOTOS = {
+    'kolonna': { src: 'assets/photos/kolonna.webp', pos: '50% 60%', rot: '0deg', zoom: 1.02 },
+    'kolonna-soft': { src: 'assets/photos/kolonna-round.webp', pos: '50% 42%', rot: '9deg', zoom: 1.32 },
+    'ekran': { src: 'assets/photos/ekran-2.webp', pos: '50% 55%', rot: '-3deg', zoom: 1.1 },
+    'dvoynoy-ekran': { src: 'assets/photos/dvoynoy-ekran.webp', pos: '50% 45%', rot: '0deg', zoom: 1.05 },
+    'klassika': { src: 'assets/photos/klassika.webp', pos: '50% 55%', rot: '0deg', zoom: 1.04 }
+  };
+  var LEGH = window.BedDraw.LEGS;
+
+  /* ---------- словарь динамических строк (RU); казахский - assets/lang/kk.js ---------- */
+  var RU = {
+    'model.kolonna': 'Колонна', 'model.kolonna-soft': 'Колонна Софт', 'model.ekran': 'Экран', 'model.dvoynoy-ekran': 'Двойной экран', 'model.klassika': 'Классика',
+    'color.belyy': 'Белый', 'color.molochnyy': 'Молочный', 'color.bezhevyy': 'Бежевый', 'color.kapuchino': 'Капучино', 'color.seryy': 'Серый', 'color.grafit': 'Графит', 'color.goluboy': 'Голубой', 'color.pudrovyy': 'Пудровый', 'color.terrakota': 'Терракота', 'color.bordo': 'Бордо',
+    'fab.chenille': 'Шенилл', 'fab.velour': 'Велюр',
+    'legs.pad': 'Подпятники', 'legs.leg': 'Ножки', 'legs.high': 'Высокие ножки под робот-пылесос',
+    'lift.no': 'Без механизма', 'lift.yes': 'С подъёмным механизмом',
+    'sum.model': 'Модель', 'sum.size': 'Размер', 'sum.lift': 'Подъёмный механизм', 'sum.fabric': 'Ткань', 'sum.color': 'цвет', 'sum.legs': 'Опоры', 'sum.matt': 'Матрас',
+    'yes': 'да', 'no': 'нет', 'matt.need': 'нужен', 'matt.noneed': 'не нужен',
+    'wa.hello': 'Здравствуйте! Хочу заказать кровать.', 'wa.calc': 'Расчёт на сайте', 'wa.name': 'Имя', 'wa.phone': 'телефон', 'wa.comment': 'Комментарий', 'wa.matt': 'матрас от 30 000 ₸'
+  };
+  function lang() { return document.documentElement.lang === 'kk' ? 'kk' : 'ru'; }
+  function t(k) { var kk = window.SITE_KK; if (lang() === 'kk' && kk && kk[k]) return kk[k]; return RU[k] || k; }
+  function r(k) { return RU[k] || k; } // текст заявки владельцу - всегда по-русски
+  function fmt(n) { return String(Math.round(n)).replace(/\B(?=(\d{3})+(?!\d))/g, NB) + NB + '₸'; }
+
+  /* ---------- Lenis + GSAP ---------- */
+  var lenis = null;
+  if (hasGsap && window.Lenis && !reduce) {
+    lenis = new window.Lenis({ lerp: 0.1, smoothWheel: true });
+    if (window.ScrollTrigger) { gsap.registerPlugin(ScrollTrigger); lenis.on('scroll', ScrollTrigger.update); }
+    gsap.ticker.add(function (tm) { lenis.raf(tm * 1000); });
+    gsap.ticker.lagSmoothing(0);
+  } else if (hasGsap && window.ScrollTrigger) { gsap.registerPlugin(ScrollTrigger); }
+  function scrollTo(target, offset) {
+    var el = typeof target === 'string' ? $(target) : target;
+    if (!el) return;
+    var off = -(parseInt(getComputedStyle(document.documentElement).getPropertyValue('--hdr')) || 76) + (offset || 0);
+    if (lenis) lenis.scrollTo(el, { offset: off, duration: 1.1 });
+    else window.scrollTo({ top: el.getBoundingClientRect().top + window.pageYOffset + off, behavior: reduce ? 'auto' : 'smooth' });
   }
-  function loadLang(lang, done) {
-    if (I18N[lang] || lang !== "kk") return done();
-    var s = doc.createElement("script");
-    s.src = "assets/lang/kk.js" + (ASSET_V ? "?v=" + ASSET_V : "");
-    s.onload = function () {
-      if (W.SITE_KK) {
-        I18N.kk = W.SITE_KK;
-        if (W.SITE_KK_WA) WA.kk = W.SITE_KK_WA;
-        if (W.SITE_KK_FORM) FORM_LABELS.kk = W.SITE_KK_FORM;
-      }
-      done();
-    };
-    s.onerror = function () { done(); };
-    doc.head.appendChild(s);
-  }
-  function setLang(lang) { loadLang(lang, function () { applyLang(lang); }); }
-  [].forEach.call(doc.querySelectorAll(".lang button"), function (b) {
-    b.addEventListener("click", function () { setLang(b.getAttribute("data-lang")); });
+  document.addEventListener('click', function (e) {
+    var a = e.target.closest('a[href^="#"]');
+    if (!a) return;
+    var id = a.getAttribute('href');
+    if (id.length < 2 || !$(id)) return;
+    e.preventDefault();
+    closeMenu();
+    scrollTo(id);
+    history.replaceState(null, '', id);
   });
-  (function initLang() {
-    /* ?lang= в адресе главнее сохранённого выбора: реклама ведёт на ?lang=ru */
-    var forced = (location.search.match(/[?&]lang=(ru|kk|en)/) || [])[1];
-    var saved = null; try { saved = localStorage.getItem("divart-lang"); } catch (e) {}
-    var lang = forced || saved || "ru";
-    if (lang !== "ru") setLang(lang);
+
+  /* ---------- шапка и меню ---------- */
+  var hdr = $('#hdr'), burger = $('.burger'), mnav = $('#mnav');
+  function onScroll() { hdr.classList.toggle('is-solid', window.pageYOffset > 24); }
+  window.addEventListener('scroll', onScroll, { passive: true }); onScroll();
+  function closeMenu() { if (!mnav || mnav.hidden) return; mnav.hidden = true; burger.setAttribute('aria-expanded', 'false'); document.body.classList.remove('menu-open'); if (lenis) lenis.start(); }
+  if (burger) burger.addEventListener('click', function () {
+    var open = mnav.hidden; mnav.hidden = !open; burger.setAttribute('aria-expanded', String(open)); document.body.classList.toggle('menu-open', open);
+    if (lenis) { open ? lenis.stop() : lenis.start(); }
+  });
+
+  /* ---------- бегущая строка цветов ---------- */
+  (function () {
+    var track = $('#marqTrack'); if (!track) return;
+    var set = track.firstElementChild;
+    function fill() {
+      var w = set.getBoundingClientRect().width; if (!w) return;
+      while (track.children.length > 1) track.removeChild(track.lastChild);
+      var need = Math.ceil((window.innerWidth * 2) / w) + 1;
+      for (var i = 0; i < need; i++) track.appendChild(set.cloneNode(true));
+      track.style.setProperty('--marq-w', w + 'px');
+      track.style.setProperty('--marq-dur', (w / 60) + 's');
+    }
+    if (document.fonts && document.fonts.ready) document.fonts.ready.then(fill); else fill();
+    var tmr; window.addEventListener('resize', function () { clearTimeout(tmr); tmr = setTimeout(fill, 200); });
   })();
 
-  /* ---------- Проявление секций ---------- */
-  var rv = [].slice.call(doc.querySelectorAll(".rv"));
-  function reveal(el) { el.classList.add("in"); [].forEach.call(el.querySelectorAll(".cush"), openCush); }
-  if ("IntersectionObserver" in W && !REDUCED) {
-    var io = new IntersectionObserver(function (es) {
-      es.forEach(function (x) { if (!x.isIntersecting) return; reveal(x.target); io.unobserve(x.target); });
-    }, { rootMargin: "0px 0px -6% 0px", threshold: 0.06 });
-    rv.forEach(function (el) { io.observe(el); });
-    setTimeout(function () { rv.forEach(function (el) { if (!el.classList.contains("in") && el.getBoundingClientRect().top < W.innerHeight) reveal(el); }); }, 1500);
-  } else { rv.forEach(function (el) { el.classList.add("in"); }); secCush.forEach(function (c) { cushSet(c, 0, 1); }); }
-
-  /* ---------- Форма -> WhatsApp ---------- */
-  var form = doc.getElementById("form"), thanks = doc.getElementById("thanks"), ferr = doc.getElementById("ferr");
-  if (form) {
-    form.addEventListener("submit", function (e) {
-      e.preventDefault();
-      var f = form.elements;
-      if (f.website && f.website.value) { form.hidden = true; if (thanks) thanks.hidden = false; return; }
-      var name = f.name.value.trim(), phone = f.phone.value.trim();
-      var badPhone = phone.replace(/\D/g, "").length < 10;
-      f.phone.classList.toggle("bad", badPhone);
-      f.phone.setAttribute("aria-invalid", badPhone ? "true" : "false");
-      if (badPhone) { if (ferr) ferr.hidden = false; f.phone.focus(); return; }
-      if (ferr) ferr.hidden = true;
-      var L = FORM_LABELS[LANG] || FORM_LABELS.ru;
-      var lines = [L.head];
-      if (name) lines.push(L.name + ": " + name);
-      lines.push(L.phone + ": " + phone);
-      var msg = f.msg.value.trim();
-      if (msg) lines.push(L.msg + ": " + msg);
-      var url = "https://wa.me/" + PHONE + "?text=" + encodeURIComponent(lines.join("\n"));
-      fireConv("form");
-      W.open(url, "_blank", "noopener");
-      if (thanks) { thanks.hidden = false; try { thanks.focus({ preventScroll: true }); } catch (err) {} }
-      form.reset();
+  /* ---------- проявление блоков ---------- */
+  (function () {
+    var sel = '.sec-head,.mcard,.step,.summary,.ptable,.ptable-side,.wcard,.why-it,.how-list li,.faq-list details,.cont-card,.cont-cta';
+    var items = $$(sel);
+    items.forEach(function (el) { el.classList.add('rv'); });
+    $$('.mgrid,.why-grid,.how-list,.faq-list,.cont-grid,.strip,.steps').forEach(function (grp) {
+      $$('.rv', grp).forEach(function (el, i) { el.style.transitionDelay = (Math.min(i, 8) * 70) + 'ms'; });
     });
+    if (!('IntersectionObserver' in window) || reduce) { items.forEach(function (el) { el.classList.add('is-in'); }); return; }
+    var io = new IntersectionObserver(function (es) { es.forEach(function (en) { if (en.isIntersecting) { en.target.classList.add('is-in'); io.unobserve(en.target); } }); }, { rootMargin: '0px 0px -8% 0px', threshold: .08 });
+    items.forEach(function (el) { io.observe(el); });
+  })();
+
+  /* ---------- конструктор ---------- */
+  var stageSvg = $('#stageBed');
+  var bed = new window.BedDraw(stageSvg, { prefix: 'st' });
+  var cfg = { model: 'kolonna', fabric: 'chenille', color: 'pudrovyy', size: 160, lift: 0, legs: 'pad', mattress: 0 };
+  var robotTween = null, liftTween = null;
+  var priceObj = { v: 110000 };
+  var priceBig = $('#priceBig'), priceSum = $('#priceSum'), sumMatt = $('#sumMatt'), sumList = $('#sumList'), chips = $('#chips'), colorCur = $('#colorCur');
+  var stage = $('#stage'), stagePhoto = $('#stagePhoto'), stagePhotoImg = $('#stagePhotoImg'), stagePhotoName = $('#stagePhotoName');
+
+  function price() { return PRICE[cfg.size][cfg.lift ? 1 : 0]; }
+  function tweenState(obj, to, dur, ease, onUpd) {
+    if (hasGsap && !reduce) return gsap.to(obj, Object.assign({ duration: dur, ease: ease || 'power2.inOut', overwrite: 'auto', onUpdate: onUpd }, to));
+    for (var k in to) obj[k] = to[k]; onUpd(); return null;
+  }
+  function setFab(svg, hex, dur) { if (hasGsap && !reduce) gsap.to(svg, { '--fab': hex, duration: dur || .6, ease: 'power2.out', overwrite: 'auto' }); else svg.style.setProperty('--fab', hex); }
+  function swapModel(b, svg, model, cb) {
+    if (b.state.model === model) { if (cb) cb(); return; }
+    if (hasGsap && !reduce) {
+      gsap.to(b.gHead, { opacity: 0, y: -10, duration: .28, ease: 'power2.in', overwrite: true, onComplete: function () { b.set({ model: model }); if (cb) cb(); gsap.to(b.gHead, { opacity: 1, y: 0, duration: .55, ease: 'power3.out' }); } });
+    } else { b.set({ model: model }); if (cb) cb(); }
+  }
+  function robot(b, on) {
+    if (b._robot) { b._robot.kill(); b._robot = null; }
+    if (!on || !hasGsap || reduce) { b.set({ robot: null }); return; }
+    var o = { x: -70 };
+    b._robot = gsap.to(o, { x: function () { return b.state.W + 70; }, duration: 2.8, ease: 'power1.inOut', repeat: -1, repeatDelay: 1.2, delay: .5, onUpdate: function () { b.set({ robot: o.x }); }, onRepeat: function () { o.x = -70; } });
+  }
+  function legsTo(b, kind, dur) {
+    b.set({ legs: kind });
+    tweenState(b.state, { legH: LEGH[kind] }, dur || .6, 'power2.inOut', function () { b.render(); });
+    robot(b, kind === 'high');
+  }
+  function liftTo(b, val, dur, ease, then) {
+    return tweenState(b.state, { lift: val }, dur, ease || 'power2.inOut', function () { b.render(); }) || (then && then());
+  }
+  function playLift(b) {
+    if (liftTween) liftTween.kill();
+    if (!hasGsap || reduce) { b.set({ lift: cfg.lift ? .16 : 0 }); return; }
+    if (!cfg.lift) { liftTween = gsap.to(b.state, { lift: 0, duration: .8, ease: 'power2.inOut', onUpdate: function () { b.render(); } }); return; }
+    liftTween = gsap.timeline()
+      .to(b.state, { lift: 1, duration: 1.2, ease: 'power2.inOut', onUpdate: function () { b.render(); } })
+      .to(b.state, { lift: .16, duration: .9, ease: 'power2.inOut', onUpdate: function () { b.render(); } }, '+=1.6');
   }
 
-  var year = doc.getElementById("year"); if (year) year.textContent = String(new Date().getFullYear());
-
-  /* ---------- Старт ---------- */
-  function start() {
-    cushResize(); fitAll(); laneState();
-    if (location.hash.length > 1) {
-      var id = location.hash.slice(1);
-      goTo(id, true);
-      setTimeout(function () { goTo(id, true); update(); }, 60);
-      setTimeout(function () { goTo(id, true); update(); }, 500);
+  function renderSummary() {
+    var pr = price();
+    if (hasGsap && !reduce) gsap.to(priceObj, { v: pr, duration: .7, ease: 'power2.out', overwrite: true, onUpdate: function () { priceBig.textContent = fmt(priceObj.v); priceSum.textContent = fmt(priceObj.v); } });
+    else { priceObj.v = pr; priceBig.textContent = fmt(pr); priceSum.textContent = fmt(pr); }
+    sumMatt.hidden = !cfg.mattress;
+    var rows = [
+      [t('sum.model'), t('model.' + cfg.model)],
+      [t('sum.size'), cfg.size + 'x200'],
+      [t('sum.lift'), cfg.lift ? t('yes') : t('no')],
+      [t('sum.fabric'), t('fab.' + cfg.fabric) + ', ' + t('sum.color') + ': ' + t('color.' + cfg.color).toLowerCase()],
+      [t('sum.legs'), t('legs.' + cfg.legs)],
+      [t('sum.matt'), cfg.mattress ? t('matt.need') : t('matt.noneed')]
+    ];
+    sumList.innerHTML = rows.map(function (r) { return '<li>' + r[0] + ': <b>' + r[1] + '</b></li>'; }).join('');
+    chips.innerHTML = '<li>' + t('model.' + cfg.model) + '</li><li><i style="--c:' + COLORS[cfg.color] + '"></i>' + t('fab.' + cfg.fabric) + ' · ' + t('color.' + cfg.color).toLowerCase() + '</li><li>' + cfg.size + 'x200</li>' +
+      (cfg.lift ? '<li>' + t('lift.yes') + '</li>' : '') + '<li>' + t('legs.' + cfg.legs) + '</li>' + (cfg.mattress ? '<li>' + t('sum.matt') + ': ' + t('matt.need') + '</li>' : '');
+    colorCur.textContent = t('color.' + cfg.color);
+    stagePhotoName.textContent = t('model.' + cfg.model);
+    $$('#ptable tbody tr').forEach(function (tr) { tr.classList.toggle('is-cur', +tr.dataset.size === cfg.size); });
+  }
+  function setPhoto(model) {
+    var ph = PHOTOS[model];
+    if (stagePhotoImg.getAttribute('src') !== ph.src) { stagePhotoImg.style.opacity = 0; stagePhotoImg.onload = function () { stagePhotoImg.style.transition = 'opacity .4s'; stagePhotoImg.style.opacity = 1; }; stagePhotoImg.setAttribute('src', ph.src); }
+    stagePhotoImg.alt = t('model.' + model);
+    stagePhoto.style.setProperty('--pos', ph.pos); stagePhoto.style.setProperty('--rot', ph.rot); stagePhoto.style.setProperty('--zoom', ph.zoom);
+  }
+  function applyAll() {
+    bed.set({ model: cfg.model, W: cfg.size, lift: cfg.lift ? .16 : 0, legs: cfg.legs, legH: LEGH[cfg.legs] });
+    stageSvg.style.setProperty('--fab', COLORS[cfg.color]);
+    stageSvg.classList.toggle('vel', cfg.fabric === 'velour'); stageSvg.classList.toggle('che', cfg.fabric !== 'velour');
+    robot(bed, cfg.legs === 'high');
+    setPhoto(cfg.model); renderSummary();
+  }
+  function onChange(name, value) {
+    switch (name) {
+      case 'model': cfg.model = value; swapModel(bed, stageSvg, value); setPhoto(value); break;
+      case 'fabric': cfg.fabric = value; stageSvg.classList.toggle('vel', value === 'velour'); stageSvg.classList.toggle('che', value !== 'velour'); break;
+      case 'color': cfg.color = value; setFab(stageSvg, COLORS[value]); break;
+      case 'size': cfg.size = +value; tweenState(bed.state, { W: cfg.size }, .8, 'power3.inOut', function () { bed.render(); }); break;
+      case 'lift': cfg.lift = +value; playLift(bed); break;
+      case 'legs': cfg.legs = value; legsTo(bed, value); break;
+      case 'mattress': cfg.mattress = +value; break;
     }
-    update();
-    if (INTRO < 1) requestAnimationFrame(runIntro);
+    renderSummary();
   }
-  if (doc.fonts && doc.fonts.ready) doc.fonts.ready.then(function () { fitAll(); cushResize(); update(); });
-  if (doc.readyState === "complete") start(); else W.addEventListener("load", start);
-  cushResize(); update();
+  $$('.steps input[type=radio]').forEach(function (inp) {
+    inp.addEventListener('change', function () { if (inp.checked) onChange(inp.name, inp.value); });
+  });
+  // повторный клик по уже выбранному механизму - показать подъём ещё раз
+  $$('.steps input[name=lift]').forEach(function (inp) {
+    inp.closest('label').addEventListener('click', function () { if (inp.checked && inp.value === '1') playLift(bed); });
+  });
+  // вид: рисунок / фото
+  $$('.seg-b').forEach(function (b) {
+    b.addEventListener('click', function () {
+      $$('.seg-b').forEach(function (x) { x.classList.toggle('is-on', x === b); x.setAttribute('aria-pressed', String(x === b)); });
+      stage.classList.toggle('view-photo', b.dataset.view === 'photo');
+    });
+  });
+  function pick(model, scroll) {
+    var inp = $('.steps input[name=model][value="' + model + '"]');
+    if (inp && !inp.checked) { inp.checked = true; onChange('model', model); }
+    if (scroll) scrollTo('#konstruktor');
+  }
+  $$('[data-pick]').forEach(function (b) { b.addEventListener('click', function () { pick(b.dataset.pick, true); }); });
+  window.addEventListener('load', function () { var h = location.hash.replace('#', ''); if (PHOTOS[h]) pick(h, false); });
+  applyAll();
+
+  /* ---------- форма -> WhatsApp ---------- */
+  var form = $('#zayavka');
+  form.addEventListener('submit', function (e) {
+    e.preventDefault();
+    var name = $('#fName').value.trim(), phone = $('#fPhone').value.trim(), comment = $('#fComment').value.trim();
+    var lines = [
+      r('wa.hello'),
+      r('sum.model') + ': ' + r('model.' + cfg.model),
+      r('sum.size') + ': ' + cfg.size + 'x200',
+      r('sum.lift') + ': ' + (cfg.lift ? r('yes') : r('no')),
+      r('sum.fabric') + ': ' + r('fab.' + cfg.fabric) + ', ' + r('sum.color') + ': ' + r('color.' + cfg.color).toLowerCase(),
+      r('sum.legs') + ': ' + r('legs.' + cfg.legs),
+      r('sum.matt') + ': ' + (cfg.mattress ? r('matt.need') : r('matt.noneed')),
+      r('wa.calc') + ': ' + fmr(price()).replace(/ /g, ' ') + (cfg.mattress ? ' (+ ' + r('wa.matt') + ')' : ''),
+      r('wa.name') + ': ' + name + ', ' + r('wa.phone') + ': ' + phone
+    ];
+    if (comment) lines.push(r('wa.comment') + ': ' + comment);
+    window.open('https://wa.me/77012320989?text=' + encodeURIComponent(lines.join('\n')), '_blank');
+  });
+
+  /* ---------- карточки моделей ---------- */
+  $$('.mcard-bed').forEach(function (svg, i) {
+    var b = new window.BedDraw(svg, { prefix: 'mc' + i });
+    b.set({ model: svg.dataset.bed, W: 160, dims: false });
+    var card = svg.closest('.mcard');
+    card.addEventListener('mouseenter', function () { liftTo(b, 1, 1.1); });
+    card.addEventListener('mouseleave', function () { liftTo(b, 0, .8); });
+  });
+
+  /* ---------- таблица цен: рисунок меняет размер под курсором ---------- */
+  (function () {
+    var svg = $('#priceBed'); if (!svg) return;
+    var b = new window.BedDraw(svg, { prefix: 'pr' });
+    b.set({ model: 'ekran', W: 160 });
+    $$('#ptable tbody tr').forEach(function (tr) {
+      tr.addEventListener('mouseenter', function () { tweenState(b.state, { W: +tr.dataset.size }, .6, 'power3.out', function () { b.render(); }); });
+      tr.addEventListener('click', function () {
+        var inp = $('.steps input[name=size][value="' + tr.dataset.size + '"]');
+        if (inp && !inp.checked) { inp.checked = true; onChange('size', tr.dataset.size); }
+        scrollTo('#konstruktor');
+      });
+      $$('td', tr).forEach(function (td, ci) { td.addEventListener('mouseenter', function () { liftTo(b, ci === 2 ? 1 : 0, .9); }); });
+    });
+    svg.closest('.ptable-side'); $('#ptable').addEventListener('mouseleave', function () { liftTo(b, 0, .8); });
+  })();
+
+  /* ---------- лента работ ---------- */
+  (function () {
+    var strip = $('#strip'), prev = $('#wPrev'), next = $('#wNext'); if (!strip) return;
+    function step() { var c = strip.firstElementChild; return c.getBoundingClientRect().width + parseFloat(getComputedStyle(strip).gap || 20); }
+    function upd() {
+      var max = strip.scrollWidth - strip.clientWidth - 2;
+      prev.disabled = strip.scrollLeft <= 2; next.disabled = strip.scrollLeft >= max;
+      var fits = strip.scrollWidth <= strip.clientWidth + 2; prev.hidden = fits; next.hidden = fits;
+    }
+    prev.addEventListener('click', function () { strip.scrollBy({ left: -step(), behavior: 'smooth' }); });
+    next.addEventListener('click', function () { strip.scrollBy({ left: step(), behavior: 'smooth' }); });
+    strip.addEventListener('scroll', upd, { passive: true }); window.addEventListener('resize', upd); upd();
+    strip.addEventListener('keydown', function (e) { if (e.key === 'ArrowRight') { e.preventDefault(); next.click(); } if (e.key === 'ArrowLeft') { e.preventDefault(); prev.click(); } });
+  })();
+
+  /* ---------- герой: комната и сборка кровати ---------- */
+  (function () {
+    var g = $('#heroBed'), scene = $('#sceneSvg'); if (!g) return;
+    var hb = new window.BedDraw(g, { prefix: 'hero', scene: true });
+    hb.set({ model: 'kolonna', W: 160, dims: false });
+    g.style.setProperty('--fab', reduce ? '#D9A5A0' : '#CFC8BD');
+    g.classList.add('bed');
+    var tag = $('#heroTag');
+    // десктоп: комната прижата к правому краю и полу, кровать (от x=600) всегда правее текста
+    function textRight() {
+      var r = 0;
+      $$('.hero-in > *').forEach(function (el) {
+        var rg = document.createRange(); rg.selectNodeContents(el);
+        Array.prototype.forEach.call(rg.getClientRects(), function (b) { if (b.width) r = Math.max(r, b.right); });
+      });
+      return r;
+    }
+    function mobileBox() {
+      var narrow = window.innerWidth < 760;
+      if (narrow) {
+        scene.setAttribute('viewBox', '590 160 820 640');
+        scene.setAttribute('preserveAspectRatio', 'xMidYMax slice');
+        return;
+      }
+      var W = scene.clientWidth, H = scene.clientHeight; if (!W || !H) return;
+      var s = Math.min(H / 800, (W - textRight() - 24) / 780);
+      s = Math.max(s, 0.45);
+      var vw = W / s, vh = H / s;
+      scene.setAttribute('viewBox', (1440 - vw) + ' ' + (800 - vh) + ' ' + vw + ' ' + vh);
+      scene.setAttribute('preserveAspectRatio', 'none');
+    }
+    if (document.fonts && document.fonts.ready) document.fonts.ready.then(mobileBox);
+    mobileBox(); window.addEventListener('resize', mobileBox);
+    if (!hasGsap || reduce) { tag.style.opacity = 1; tag.style.transform = 'none'; return; }
+
+    // заголовок построчно
+    try {
+      if (window.SplitText) {
+        gsap.registerPlugin(SplitText);
+        var split = SplitText.create('#h1', { type: 'lines', mask: 'lines', autoSplit: true });
+        gsap.from(split.lines, { yPercent: 110, duration: 1.1, ease: 'power4.out', stagger: .09, delay: .2 });
+      }
+    } catch (err) { /* без SplitText заголовок просто стоит */ }
+    gsap.from('.hero .kicker', { opacity: 0, y: 10, duration: .8, delay: .1 });
+    gsap.from('.hero .lead, .hero-cta, .hero .ig-link', { opacity: 0, y: 18, duration: .9, ease: 'power3.out', stagger: .1, delay: .6 });
+
+    // сборка: изголовье падает, царга въезжает, основание с матрасом опускается, опоры, цвет
+    gsap.set(hb.gHead, { y: -260, opacity: 0 });
+    gsap.set(hb.gBase, { x: -420, opacity: 0 });
+    gsap.set(hb.gLid, { y: -220, opacity: 0 });
+    gsap.set([hb.gLegs, hb.gShadow], { opacity: 0 });
+    gsap.set('#scWall', { opacity: 0 }); gsap.set('#scFloor', { opacity: 0, y: 30 }); gsap.set('#scFg', { opacity: 0 });
+    var intro = gsap.timeline({ defaults: { ease: 'power3.out' } });
+    intro.to('#scWall', { opacity: 1, duration: .9 }, 0)
+      .to('#scFloor', { opacity: 1, y: 0, duration: .9 }, .15)
+      .to('#scFg', { opacity: 1, duration: .9 }, .4)
+      .to(hb.gShadow, { opacity: 1, duration: .6 }, .9)
+      .to(hb.gHead, { y: 0, opacity: 1, duration: 1.0, ease: 'back.out(1.1)' }, .6)
+      .to(hb.gBase, { x: 0, opacity: 1, duration: .9, ease: 'power3.out' }, 1.1)
+      .to(hb.gLegs, { opacity: 1, duration: .4 }, 1.6)
+      .to(hb.gLid, { y: 0, opacity: 1, duration: .8, ease: 'power2.in' }, 1.5)
+      .to(hb.root, { y: 3, duration: .1, yoyo: true, repeat: 1, ease: 'power1.inOut' }, 2.3)
+      .to(g, { '--fab': '#D9A5A0', duration: 1.1, ease: 'power2.inOut' }, 2.4)
+      .to(tag, { opacity: 1, y: 0, duration: .7, ease: 'power3.out' }, 3.0);
+
+    // демо-цикл: механизм, другая модель и цвет, другой размер, высокие ножки и робот
+    var seq = [
+      { model: 'ekran', color: '#D9C7AC', W: 180, legs: 'leg' },
+      { model: 'dvoynoy-ekran', color: '#EFE6D6', W: 200, legs: 'high' },
+      { model: 'klassika', color: '#B99A7A', W: 140, legs: 'pad' },
+      { model: 'kolonna-soft', color: '#6E2434', W: 160, legs: 'high' },
+      { model: 'kolonna', color: '#D9A5A0', W: 160, legs: 'leg' }
+    ];
+    var si = 0, demo = null, visible = true;
+    function r() { hb.render(); }
+    function cycle() {
+      var s = seq[si]; si = (si + 1) % seq.length;
+      demo = gsap.timeline({ onComplete: cycle, defaults: { ease: 'power2.inOut' } });
+      demo.to(hb.state, { lift: 1, duration: 1.3, onUpdate: r })
+        .to(hb.state, { lift: 0, duration: 1.0, onUpdate: r }, '+=1.5')
+        .to(hb.gHead, { opacity: 0, y: -14, duration: .3, ease: 'power2.in' }, '+=.6')
+        .add(function () { hb.set({ model: s.model }); gsap.to(g, { '--fab': s.color, duration: .9, ease: 'power2.inOut' }); })
+        .to(hb.gHead, { opacity: 1, y: 0, duration: .6, ease: 'power3.out' })
+        .to(hb.state, { W: s.W, duration: 1.1, ease: 'power3.inOut', onUpdate: r }, '+=.4')
+        .add(function () { hb.set({ legs: s.legs }); }, '+=.5')
+        .to(hb.state, { legH: LEGH[s.legs], duration: .7, onUpdate: r });
+      if (s.legs === 'high') {
+        var o = { x: -70 };
+        demo.to(o, { x: s.W + 70, duration: 2.6, ease: 'power1.inOut', onUpdate: function () { hb.set({ robot: o.x }); }, onComplete: function () { hb.set({ robot: null }); } }, '+=.2');
+      }
+      demo.to({}, { duration: .8 });
+    }
+    intro.add(cycle, '+=1.2');
+
+    // тихая жизнь сцены
+    gsap.to('#scGlow', { opacity: .55, duration: 3.2, yoyo: true, repeat: -1, ease: 'sine.inOut' });
+    gsap.to('#scGlow', { opacity: .7, duration: 2.4, yoyo: true, repeat: -1, ease: 'sine.inOut' });
+    gsap.to('#scClouds', { x: 26, duration: 14, yoyo: true, repeat: -1, ease: 'sine.inOut' });
+    gsap.to('#scSheer', { scaleX: 1.06, transformOrigin: '1010px 0px', duration: 4.5, yoyo: true, repeat: -1, ease: 'sine.inOut' });
+
+    // параллакс мышью (десктоп) и по прокрутке
+    if (window.matchMedia('(hover:hover) and (min-width:900px)').matches) {
+      var qx = {}, qy = {};
+      [['#scWall', 6], ['#scFloor', 10], ['#scBedL', 14], ['#scFg', 26]].forEach(function (l) {
+        qx[l[0]] = gsap.quickTo(l[0], 'x', { duration: 1.2, ease: 'power3.out' });
+        qy[l[0]] = gsap.quickTo(l[0], 'y', { duration: 1.2, ease: 'power3.out' });
+        $(l[0]).dataset.amp = l[1];
+      });
+      $('.hero').addEventListener('mousemove', function (e) {
+        var nx = (e.clientX / window.innerWidth - .5), ny = (e.clientY / window.innerHeight - .5);
+        for (var k in qx) { var amp = +$(k).dataset.amp; qx[k](-nx * amp); qy[k](-ny * amp * .6); }
+      });
+    }
+    if (window.ScrollTrigger) {
+      gsap.to('#scene', { y: 140, ease: 'none', scrollTrigger: { trigger: '.hero', start: 'top top', end: 'bottom top', scrub: true } });
+      gsap.to('.hero-in', { y: -60, opacity: 0, ease: 'none', scrollTrigger: { trigger: '.hero', start: '40% top', end: 'bottom top', scrub: true } });
+      ScrollTrigger.create({ trigger: '.hero', start: 'top bottom', end: 'bottom top', onToggle: function (st) { visible = st.isActive; if (demo) { visible ? demo.play() : demo.pause(); } } });
+    }
+  })();
+
+  /* ---------- язык: RU в разметке, KZ - словарь по клику ---------- */
+  (function () {
+    var nodes = $$('[data-i18n]');
+    nodes.forEach(function (el) { el.dataset.ru = el.tagName === 'META' ? el.getAttribute('content') : el.innerHTML; });
+    function apply(l) {
+      var kk = window.SITE_KK || {};
+      document.documentElement.lang = l;
+      nodes.forEach(function (el) {
+        var k = el.dataset.i18n, v = l === 'kk' ? kk[k] : null;
+        if (el.tagName === 'META') el.setAttribute('content', v || el.dataset.ru);
+        else el.innerHTML = v || el.dataset.ru;
+      });
+      $$('.lang-b').forEach(function (b) { b.setAttribute('aria-pressed', String(b.dataset.lang === l)); });
+      try { localStorage.setItem('lang', l); } catch (err) {}
+      renderSummary();
+    }
+    function setLang(l) {
+      if (l === 'kk' && !window.SITE_KK) {
+        var me = document.currentScript || $('script[src^="script.js"]');
+        var v = me && /v=([\w-]+)/.exec(me.getAttribute('src') || '');
+        var s = document.createElement('script');
+        s.src = 'assets/lang/kk.js' + (v ? '?v=' + v[1] : '');
+        s.onload = function () { apply('kk'); };
+        document.head.appendChild(s);
+        return;
+      }
+      apply(l);
+    }
+    $$('.lang-b').forEach(function (b) { b.addEventListener('click', function () { setLang(b.dataset.lang); }); });
+    var q = /[?&]lang=(ru|kk)/.exec(location.search), saved = null;
+    try { saved = localStorage.getItem('lang'); } catch (err) {}
+    var init = q ? q[1] : saved;
+    if (init === 'kk') setLang('kk');
+  })();
 })();
