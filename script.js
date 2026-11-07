@@ -305,7 +305,7 @@
   window.BedDraw.P = P;
 })();
 /* Кровать Тахта - логика страницы: конструктор, герой, карточки, лента, язык. */
-(function () {
+function ktMain() {
   'use strict';
   var $ = function (s, r) { return (r || document).querySelector(s); };
   var $$ = function (s, r) { return Array.prototype.slice.call((r || document).querySelectorAll(s)); };
@@ -663,7 +663,7 @@
     gsap.set(hb.gBase, { x: -420, opacity: 0 });
     gsap.set(hb.gLid, { y: -220, opacity: 0 });
     gsap.set([hb.gLegs, hb.gShadow], { opacity: 0 });
-    gsap.set('#scWall', { opacity: 0 }); gsap.set('#scFloor', { opacity: 0, y: 30 }); gsap.set('#scFg', { opacity: 0 });
+    if (!narrowHero) { gsap.set('#scWall', { opacity: 0 }); gsap.set('#scFloor', { opacity: 0, y: 30 }); gsap.set('#scFg', { opacity: 0 }); }
     var intro = gsap.timeline({ defaults: { ease: 'power3.out' } });
     intro.to('#scWall', { opacity: 1, duration: .9 }, 0)
       .to('#scFloor', { opacity: 1, y: 0, duration: .9 }, .15)
@@ -766,4 +766,6 @@
     var init = q ? q[1] : saved;
     if (init === 'kk') setLang('kk');
   })();
-})();
+}
+// на телефоне запуск после первого кадра: заголовок героя рисуется раньше (LCP)
+if (window.innerWidth < 760) requestAnimationFrame(function () { setTimeout(ktMain, 0); }); else ktMain();
