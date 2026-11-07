@@ -644,16 +644,19 @@
     mobileBox(); window.addEventListener('resize', mobileBox);
     if (!hasGsap || reduce) { tag.style.opacity = 1; tag.style.transform = 'none'; return; }
 
-    // заголовок построчно
+    // заголовок построчно (на телефоне текст героя виден сразу - быстрее первый экран, LCP)
+    var narrowHero = window.innerWidth < 760;
     try {
-      if (window.SplitText) {
+      if (window.SplitText && !narrowHero) {
         gsap.registerPlugin(SplitText);
         var split = SplitText.create('#h1', { type: 'lines', mask: 'lines', autoSplit: true });
         gsap.from(split.lines, { yPercent: 110, duration: 1.1, ease: 'power4.out', stagger: .09, delay: .2 });
       }
     } catch (err) { /* без SplitText заголовок просто стоит */ }
-    gsap.from('.hero .kicker', { opacity: 0, y: 10, duration: .8, delay: .1 });
-    gsap.from('.hero .lead, .hero-cta, .hero .ig-link', { opacity: 0, y: 18, duration: .9, ease: 'power3.out', stagger: .1, delay: .6 });
+    if (!narrowHero) {
+      gsap.from('.hero .kicker', { opacity: 0, y: 10, duration: .8, delay: .1 });
+      gsap.from('.hero .lead, .hero-cta, .hero .ig-link', { opacity: 0, y: 18, duration: .9, ease: 'power3.out', stagger: .1, delay: .6 });
+    }
 
     // сборка: изголовье падает, царга въезжает, основание с матрасом опускается, опоры, цвет
     gsap.set(hb.gHead, { y: -260, opacity: 0 });
