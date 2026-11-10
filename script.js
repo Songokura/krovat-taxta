@@ -519,10 +519,23 @@ function ktMain() {
   window.addEventListener('load', function () { var h = location.hash.replace('#', ''); if (PHOTOS[h]) pick(h, false); });
   applyAll();
 
+  /* ---------- конверсии Google Ads ---------- */
+  function fireConv(key) {
+    if (typeof window.gtag_report_conversion !== 'function' || !window.AW_CONV) return;
+    var sendTo = window.AW_CONV[key];
+    if (sendTo) window.gtag_report_conversion(undefined, sendTo);
+  }
+  document.addEventListener('click', function (e) {
+    var a = e.target && e.target.closest ? e.target.closest('a[href^="tel:"], a[href*="wa.me"]') : null;
+    if (!a) return;
+    fireConv(a.getAttribute('href').indexOf('tel:') === 0 ? 'phone' : 'contact');
+  });
+
   /* ---------- форма -> WhatsApp ---------- */
   var form = $('#zayavka');
   form.addEventListener('submit', function (e) {
     e.preventDefault();
+    fireConv('form');
     var name = $('#fName').value.trim(), phone = $('#fPhone').value.trim(), comment = $('#fComment').value.trim();
     var lines = [
       r('wa.hello'),
