@@ -468,6 +468,7 @@ function ktMain() {
     chips.innerHTML = '<li>' + t('model.' + cfg.model) + '</li><li><i style="--c:' + COLORS[cfg.color] + '"></i>' + t('fab.' + cfg.fabric) + ' · ' + t('color.' + cfg.color).toLowerCase() + '</li><li>' + cfg.size + 'x200</li>' +
       (cfg.lift ? '<li>' + t('lift.yes') + '</li>' : '') + '<li>' + t('legs.' + cfg.legs) + '</li>' + (cfg.mattress ? '<li>' + t('sum.matt') + ': ' + t('matt.need') + '</li>' : '');
     colorCur.textContent = t('color.' + cfg.color);
+    if (typeof updateWa === 'function') updateWa();
     $$('#ptable tbody tr').forEach(function (tr) { tr.classList.toggle('is-cur', +tr.dataset.size === cfg.size); });
   }
   function setPhoto(model) {
@@ -528,15 +529,13 @@ function ktMain() {
   document.addEventListener('click', function (e) {
     var a = e.target && e.target.closest ? e.target.closest('a[href^="tel:"], a[href*="wa.me"]') : null;
     if (!a) return;
-    fireConv(a.getAttribute('href').indexOf('tel:') === 0 ? 'phone' : 'contact');
+    fireConv(a.getAttribute('href').indexOf('tel:') === 0 ? 'phone' : (a.id === 'konstWa' ? 'form' : 'contact'));
   });
 
-  /* ---------- форма -> WhatsApp ---------- */
-  var form = $('#zayavka');
-  form.addEventListener('submit', function (e) {
-    e.preventDefault();
-    fireConv('form');
-    var name = $('#fName').value.trim(), phone = $('#fPhone').value.trim(), comment = $('#fComment').value.trim();
+  /* ---------- кнопка WhatsApp конструктора: текст заявки из выбранных вариантов ---------- */
+  var konstWa = $('#konstWa');
+  function updateWa() {
+    if (!konstWa) return;
     var lines = [
       r('wa.hello'),
       r('sum.model') + ': ' + r('model.' + cfg.model),
@@ -545,12 +544,11 @@ function ktMain() {
       r('sum.fabric') + ': ' + r('fab.' + cfg.fabric) + ', ' + r('sum.color') + ': ' + r('color.' + cfg.color).toLowerCase(),
       r('sum.legs') + ': ' + r('legs.' + cfg.legs),
       r('sum.matt') + ': ' + (cfg.mattress ? r('matt.need') : r('matt.noneed')),
-      r('wa.calc') + ': ' + fmt(price()).replace(/ /g, ' ') + (cfg.mattress ? ' (+ ' + r('wa.matt') + ')' : ''),
-      r('wa.name') + ': ' + name + ', ' + r('wa.phone') + ': ' + phone
+      r('wa.calc') + ': ' + fmt(price()).replace(/\u00a0/g, ' ') + (cfg.mattress ? ' (+ ' + r('wa.matt') + ')' : '')
     ];
-    if (comment) lines.push(r('wa.comment') + ': ' + comment);
-    window.open('https://wa.me/77012320989?text=' + encodeURIComponent(lines.join('\n')), '_blank');
-  });
+    konstWa.href = 'https://wa.me/77012320989?text=' + encodeURIComponent(lines.join('\n'));
+  }
+  updateWa();
 
   /* ---------- карточки моделей ---------- */
   $$('.mcard-bed').forEach(function (svg, i) {

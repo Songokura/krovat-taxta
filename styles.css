@@ -188,6 +188,7 @@ ul,ol{padding:0;list-style:none}
 .fld input,.fld textarea{background:rgba(255,255,255,.07);border:1px solid rgba(244,239,231,.2);border-radius:12px;padding:12px 14px;color:var(--paper);font-size:16px;transition:border-color var(--fast),background var(--fast);resize:vertical}
 .fld input:focus,.fld textarea:focus{outline:none;border-color:rgba(244,239,231,.7);background:rgba(255,255,255,.1)}
 .form-cta{grid-column:1/-1;display:flex;flex-wrap:wrap;gap:12px;margin-top:6px}
+.sum-cta{position:relative;margin-top:22px;padding-top:22px;border-top:1px solid rgba(244,239,231,.15)}
 .form-cta .btn-ghost{border-color:rgba(244,239,231,.3);color:var(--paper)}
 .form-cta .btn-ghost:hover{border-color:var(--paper);background:rgba(255,255,255,.06)}
 

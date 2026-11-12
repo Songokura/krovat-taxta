@@ -21,7 +21,7 @@
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link rel="preload" as="style" href="https://fonts.googleapis.com/css2?family=Golos+Text:wght@400;500;600&family=Prata&display=swap" onload="this.onload=null;this.rel='stylesheet'">
 <noscript><link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Golos+Text:wght@400;500;600&family=Prata&display=swap"></noscript>
-<link rel="stylesheet" href="styles.css?v=20261110-1">
+<link rel="stylesheet" href="styles.css?v=20261112-1">
 <script type="application/ld+json">
 {"@context":"https://schema.org","@type":"LocalBusiness","name":"Кровать Тахта","url":"https://krovat-taxta.kz/","image":"https://krovat-taxta.kz/assets/og-krovat.jpg","description":"Кровати на заказ в Астане: 5 моделей, 8 размеров, шенилл и велюр в 10 цветах. Своё производство.","telephone":"+77012320989","address":{"@type":"PostalAddress","streetAddress":"ул. Дукенулы, 31, ТЦ «Асем», склад 18","addressLocality":"Астана","addressCountry":"KZ"},"openingHours":"Mo-Su 09:00-19:00","sameAs":["https://www.instagram.com/krovat_taxta/"],"priceRange":"от 80 000 ₸"}
 </script>
@@ -371,15 +371,10 @@
           <div class="sum-total"><span data-i18n="konst.total2">Итого:</span> <strong id="priceSum">110&nbsp;000&nbsp;₸</strong><span class="sum-matt" id="sumMatt" hidden>+ <span data-i18n="konst.matt">матрас от 30&nbsp;000&nbsp;₸</span></span></div>
           <p class="sum-note" data-i18n="konst.note">Расчёт по прайсу. Менеджер подтвердит детали и срок в WhatsApp.</p>
         </div>
-        <form class="form" id="zayavka" autocomplete="on">
-          <label class="fld"><span data-i18n="form.name">Имя</span><input type="text" name="name" id="fName" required autocomplete="name"></label>
-          <label class="fld"><span data-i18n="form.phone">Телефон</span><input type="tel" name="phone" id="fPhone" required autocomplete="tel" inputmode="tel" placeholder="+7"></label>
-          <label class="fld fld-wide"><span data-i18n="form.comment">Комментарий (необязательно)</span><textarea name="comment" id="fComment" rows="2"></textarea></label>
-          <div class="form-cta">
-            <button type="submit" class="btn btn-wa btn-lg"><svg width="20" height="20"><use href="#ic-wa"/></svg><span data-i18n="form.send">Отправить заявку в WhatsApp</span></button>
-            <a class="btn btn-ghost btn-lg" href="tel:+77012320989"><svg width="16" height="16"><use href="#ic-tel"/></svg><span data-i18n="hdr.call">Позвонить</span></a>
-          </div>
-        </form>
+        <div class="form-cta sum-cta" id="zayavka">
+          <a class="btn btn-wa btn-lg" id="konstWa" href="https://wa.me/77012320989"><svg width="20" height="20"><use href="#ic-wa"/></svg><span data-i18n="form.send">Отправить заявку в WhatsApp</span></a>
+          <a class="btn btn-ghost btn-lg" href="tel:+77012320989"><svg width="16" height="16"><use href="#ic-tel"/></svg><span data-i18n="hdr.call">Позвонить</span></a>
+        </div>
       </div>
     </div>
   </div>
@@ -540,6 +535,6 @@
 <script src="assets/vendor/ScrollTrigger.min.js" defer></script>
 <script src="assets/vendor/SplitText.min.js" defer></script>
 <script src="assets/vendor/lenis.min.js" defer></script>
-<script src="script.js?v=20261110-1" defer></script>
+<script src="script.js?v=20261112-1" defer></script>
 </body>
 </html>
