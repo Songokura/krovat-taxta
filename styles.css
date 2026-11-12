@@ -272,6 +272,10 @@ ul,ol{padding:0;list-style:none}
 .cont-v a:hover{color:var(--accent)}
 .cont-cta{display:flex;flex-direction:column;gap:12px;justify-content:center}
 .cont-cta .btn{justify-content:center}
+.cont-lead{position:relative;overflow:hidden;margin-top:22px;background:var(--ink);color:var(--paper);border-radius:var(--r);padding:30px 28px}
+.cont-lead::before{content:"";position:absolute;inset:0;background:radial-gradient(60% 70% at 100% 0,rgba(193,81,46,.28),transparent 70%);pointer-events:none}
+.cont-lead .h3{position:relative}
+.cont-lead .form{margin-top:18px}
 
 /* подвал */
 .foot{padding:36px 0 110px;border-top:1px solid var(--line)}
@@ -347,7 +351,7 @@ ul,ol{padding:0;list-style:none}
   .step{padding:16px 14px 18px}
   .opts-model .opt,.opt-big,.opts-3 .opt-big{flex-basis:100%}
   .opts-size .opt{flex-basis:calc(50% - 8px)}
-  .summary{padding:22px 18px 24px}
+  .summary,.cont-lead{padding:22px 18px 24px}
   .sum-list{grid-template-columns:1fr}
   .sum-total strong{font-size:36px}
   .form{grid-template-columns:1fr}

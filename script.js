@@ -550,6 +550,17 @@ function ktMain() {
   }
   updateWa();
 
+  /* ---------- форма заявки в контактах -> WhatsApp ---------- */
+  var form = $('#zayavka');
+  if (form) form.addEventListener('submit', function (e) {
+    e.preventDefault();
+    fireConv('form');
+    var name = $('#fName').value.trim(), phone = $('#fPhone').value.trim(), comment = $('#fComment').value.trim();
+    var lines = [r('wa.hello'), r('wa.name') + ': ' + name + ', ' + r('wa.phone') + ': ' + phone];
+    if (comment) lines.push(r('wa.comment') + ': ' + comment);
+    window.open('https://wa.me/77012320989?text=' + encodeURIComponent(lines.join('\n')), '_blank');
+  });
+
   /* ---------- карточки моделей ---------- */
   $$('.mcard-bed').forEach(function (svg, i) {
     var b = new window.BedDraw(svg, { prefix: 'mc' + i });
